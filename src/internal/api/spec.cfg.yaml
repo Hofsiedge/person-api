@@ -1,0 +1,4 @@
+generate:
+  embedded-spec:  true
+output: spec.gen.go
+package: api

@@ -1,0 +1,34 @@
+#!/bin/sh
+
+STAGED_GO_FILES=$(git diff --cached --name-only | grep ".go$")
+
+if [[ "$STAGED_GO_FILES" = "" ]]; then
+  exit 0
+fi
+
+# colors
+NORMAL=$(tput sgr0)
+LIME_YELLOW=$(tput setaf 190)
+RED=$(tput setaf 1)
+GREEN=$(tput setaf 2)
+
+# Check for golangci-lint
+if ! command -v golangci-lint >/dev/null 2>&1
+then
+  printf "${RED}Please install golangci-lint${NORMAL}\n"
+  exit 1
+fi
+
+printf "${LIME_YELLOW}Running golangci-lint on all staged *.go files...${NORMAL}\n"
+
+
+pushd src
+golangci-lint run
+if [[ $? != 0 ]]; then
+  printf "${RED}Linting failed! ${NORMAL}Please fix errors before committing.\n"
+  popd
+  exit 1
+else
+ printf "${GREEN}Linting passed! ${NORMAL}Continuing to commit.\n"
+fi
+popd

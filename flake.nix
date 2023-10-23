@@ -42,9 +42,22 @@
             remove-non-nix-tools = ''
               sudo rm -rf .nix-node .nix-go
             '';
+            test-server = ''
+              pushd src
+              CGO_ENABLED=1 go test -race -vet="" -coverpkg=./... \
+                -coverprofile=cover.out ./...
+              go tool cover -html=cover.out -o cover.html
+              popd
+            '';
           });
         tools = with pkgs; [
           git
+          go_1_21
+          golangci-lint
+          gotools
+          go-tools
+          impl
+
           # for redocly
           nodejs_latest
         ];
@@ -53,6 +66,9 @@
           name = "test-project";
           buildInputs = tools ++ scripts;
           shellHook = ''
+            # git setup
+            git config core.hooksPath .githooks
+
             # custom prompt
             export PS1="\n(${name}) \[${fmt.bold_green}\][\[\e]0;\u@\h: \w\a\]\u@\h:\w]\n\$\[${fmt.reset}\] ";
 
@@ -64,11 +80,25 @@
             # make executables available
             export PATH=$NODE_PATH/bin:$PATH
 
+            # -- go setup --
+            mkdir -p .nix-go
+            # make go use a local directory
+            export GOPATH=$PWD/.nix-go
+            # make executables available
+            export PATH=$GOPATH/bin:$PATH
+            # -- end of go setup --
+
             # -- installing additional tools --
             # install redocly if not installed already
             command -v redocly >/dev/null 2>&1 || \
               npm install @redocly/cli --global
+            # install oapi-codegen if not installed already
+            command -v oapi-codegen >/dev/null 2>&1 || \
+              go install github.com/deepmap/oapi-codegen/cmd/oapi-codegen@latest
           '';
+          env = {
+            CGO_ENABLED = 0; # pkgs.delve does not work otherwise
+          };
         };
       }
     );

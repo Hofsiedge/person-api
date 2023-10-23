@@ -42,6 +42,10 @@ components:
         total_items:
           minimum: 0
           type: integer
+      required:
+        - current_limit
+        - current_offset
+        - total_items
       type: object
 
     PersonBase:
@@ -63,9 +67,7 @@ components:
     PersonFull:
       allOf:
         - $ref: '#/components/schemas/PersonPartial'
-        # TODO: check if this actually works (both in spec and in oapi-codegen)
         - required:
-            - id
             - name
             - surname
             - patronymic
@@ -74,14 +76,27 @@ components:
             - sex
           type: object
 
+    PersonFullWithID:
+      allOf:
+        - $ref: '#/components/schemas/PersonFull'
+        - properties:
+            id:
+              $ref: '#/components/schemas/UUID'
+          required:
+            - id
+          type: object
+
     PersonPage:
       properties:
         pagination:
           $ref: '#/components/schemas/PaginationOffsetLimit'
         people:
           items:
-            $ref: '#/components/schemas/PersonFull'
+            $ref: '#/components/schemas/PersonFullWithID'
           type: array
+      required:
+        - pagination
+        - people
       type: object
 
     PersonPartial:
@@ -90,27 +105,28 @@ components:
         - properties:
             age:
               $ref: '#/components/schemas/Age'
-            id:
-              $ref: '#/components/schemas/UUID'
-              readonly: true
             nationality:
               $ref: '#/components/schemas/CountryCode'
             sex:
-              enum:
-                - male
-                - female
-              example: male
-              type: string
+              $ref: '#/components/schemas/Sex'
           type: object
 
 
     PersonPostData:
       allOf:
         - $ref: '#/components/schemas/PersonBase'
-      required:
-        - name
-        - patronymic
-        - surname
+        - required:
+          - name
+          - patronymic
+          - surname
+          type: object
+
+    Sex:
+      enum:
+        - male
+        - female
+      example: male
+      type: string
 
     UUID:
       example: c33f4ac4-435a-46f1-b225-5956b1c9c2c5
@@ -122,10 +138,10 @@ components:
       x-go-type-import:
         path: github.com/google/uuid
 
-  securitySchemes:
-    basicAuth:
-      scheme: basic
-      type: http
+  # securitySchemes:
+  #   basicAuth:
+  #     scheme: basic
+  #     type: http
     
 
 info:
@@ -175,6 +191,11 @@ paths:
           name: nationality
           schema:
             $ref: '#/components/schemas/CountryCode'
+        - description: Person's sex
+          in: query
+          name: sex
+          schema:
+            $ref: '#/components/schemas/Sex'
         - description: The number of records to skip
           in: query
           name: offset
@@ -224,6 +245,21 @@ paths:
       summary: Create a Person
 
   /person/{personID}:
+    delete:
+      operationId: personDelete
+      parameters:
+        - $ref: '#/components/parameters/personID'
+      responses:
+        '200': 
+          description: Person was deleted successfully
+        '400':
+          description: The specified ID is not a valid UUID
+        '404':
+          $ref: '#/components/responses/404NotFound'
+        '5XX':
+          $ref: '#/components/responses/5XXInternalServerError'
+      summary: Delete a Person by id    
+        
     get:
       operationId: personGet
       parameters:
@@ -233,7 +269,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/PersonFull'
+                $ref: '#/components/schemas/PersonFullWithID'
           description: The Person with specified id
         '400':
           description: The specified ID is not a valid UUID
@@ -302,8 +338,8 @@ paths:
           $ref: '#/components/responses/5XXInternalServerError'
       summary: Replace a Person
 
-security:
-  - basicAuth: []
+security: []
+  # - basicAuth: []
 
 servers:
   - description: Local API

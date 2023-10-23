@@ -1,0 +1,5 @@
+generate:
+  gorilla-server: true
+  strict-server:  true
+output: server.gen.go
+package: api

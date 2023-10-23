@@ -1,0 +1,46 @@
+linters:
+  disable:
+    - deadcode
+    - depguard
+    - exhaustivestruct
+    - godot
+    - golint
+    - ifshort
+    - interfacer
+    - maligned
+    - nosnakecase
+    - scopelint
+    - structcheck
+    - varcheck
+  enable-all: true
+
+linters-settings:
+  exhaustive:
+    check:
+      - switch
+      - map
+  godox:
+    keywords:
+      - FIXME
+  ireturn:
+    allow:
+      - anon
+      - error
+      - empty
+      - stdlib
+      - generic
+  revive:
+    rules:
+      - disabled: true
+        name: unused-parameter
+
+run:
+  skip-files:
+    - ".*\\.gen\\.go$" # ignore generated files
+
+severity:
+  default-severity: warning
+  rules:
+    - linters:
+        - godox
+      severity: error

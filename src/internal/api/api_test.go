@@ -23,7 +23,6 @@ import (
 	"github.com/Hofsiedge/person-api/internal/domain"
 	"github.com/Hofsiedge/person-api/internal/repo"
 	"github.com/Hofsiedge/person-api/internal/repo/mock"
-
 	"github.com/google/uuid"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 	"golang.org/x/text/cases"
@@ -31,22 +30,27 @@ import (
 )
 
 type testCase struct {
-	name   string
 	init   func(t *testing.T, people repo.PersonRepo) (req *http.Request, check func(response *http.Response))
+	name   string
 	status int
 }
 
 func subtests(t *testing.T, testCases []testCase) {
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
+	t.Helper()
+
+	for _, tCase := range testCases {
+		test := tCase
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
 			people := mock.New()
-			request, check := tc.init(t, people)
+			request, check := test.init(t, people) //nolint:bodyclose
 			result := serve(t, request, people)
+			defer result.Body.Close()
 
 			// check status codes
-			if tc.status != result.StatusCode {
+			if test.status != result.StatusCode {
 				t.Errorf("unexpected status code: expected %d, got %d",
-					tc.status, result.StatusCode)
+					test.status, result.StatusCode)
 			}
 			// run checks
 			if check != nil {
@@ -57,46 +61,63 @@ func subtests(t *testing.T, testCases []testCase) {
 }
 
 func checkNoBody(t *testing.T, response *http.Response) {
+	t.Helper()
+
 	if response.Body == nil {
 		return
 	}
+
 	var data map[string]any
+
 	bytes, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatalf("could not read response body: %v", err)
 	}
+
 	if len(bytes) == 0 {
 		return
 	}
+
 	if err = json.Unmarshal(bytes, &data); err != nil {
 		t.Fatalf("could not unmarshal unexpected response body: %v\nbody: %s", err, bytes)
 	}
+
 	t.Errorf("unexpected response body: %v", data)
 }
 
 func unmarshalJSONBody[T any](t *testing.T, response *http.Response) T {
+	t.Helper()
+
 	var body T
+
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatalf("unexpected error reading response body: %v", err)
 	}
+
 	if err = json.Unmarshal(data, &body); err != nil {
 		t.Fatalf("unexpected error unmarshalling JSON response: %v\ndata: %s", err, data)
 	}
+
 	return body
 }
 
 func checkStringBody(t *testing.T, response *http.Response, pattern *regexp.Regexp) {
+	t.Helper()
+
 	data, err := io.ReadAll(response.Body)
 	if err != nil {
 		t.Fatalf("unexpected error reading response body: %v", err)
 	}
+
 	if !pattern.Match(data) {
 		t.Errorf("response body does not match the pattern.\nresponse: %s", data)
 	}
 }
 
 func checkBody[T any](t *testing.T, response *http.Response, expected T) {
+	t.Helper()
+
 	body := unmarshalJSONBody[T](t, response)
 	if !reflect.DeepEqual(body, expected) {
 		t.Errorf("body mismatch: expected %v, got %v", expected, body)
@@ -105,7 +126,14 @@ func checkBody[T any](t *testing.T, response *http.Response, expected T) {
 
 // initialize a server and run request against it
 func serve(t *testing.T, request *http.Request, people repo.PersonRepo) *http.Response {
-	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{}))
+	t.Helper()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, &slog.HandlerOptions{
+		AddSource:   false,
+		Level:       nil,
+		ReplaceAttr: nil,
+	}))
+
 	server, err := api.New(people, logger)
 	if err != nil {
 		t.Fatalf("error creating a server: %v", err)
@@ -121,21 +149,21 @@ func serve(t *testing.T, request *http.Request, people repo.PersonRepo) *http.Re
 
 	handler := api.HandlerWithOptions(
 		api.NewStrictHandler(server, []api.StrictMiddlewareFunc{}),
-		api.GorillaServerOptions{
-			Middlewares: []api.MiddlewareFunc{
-				// TODO: find out why it screws everything over
-				oapiValidator,
-			},
+		api.GorillaServerOptions{ //nolint:exhaustruct
+			Middlewares: []api.MiddlewareFunc{oapiValidator},
 		},
 	)
 	recorder := httptest.NewRecorder()
 	handler.ServeHTTP(recorder, request)
 	result := recorder.Result()
+
 	return result
 }
 
+//nolint:gosec
 func generateRandomString(minLength, maxLength uint) string {
 	const letters = "abcdefghijklmnopqrstuvwxyz"
+
 	var builder strings.Builder
 
 	length := minLength + (uint(rand.Int()) % (maxLength + 1 - minLength))
@@ -143,22 +171,25 @@ func generateRandomString(minLength, maxLength uint) string {
 		letter := letters[rand.Int()%len(letters)]
 		builder.WriteByte(letter)
 	}
+
 	return builder.String()
 }
 
 func makePerson() domain.Person {
 	capitalizer := cases.Title(language.Und)
+
 	sex := domain.Male
-	if rand.Float32() < 0.5 {
+	if rand.Float32() < 0.5 { //nolint:gosec
 		sex = domain.Female
 	}
+
 	return domain.Person{
 		Name:        capitalizer.String(generateRandomString(2, 10)),
 		Surname:     capitalizer.String(generateRandomString(2, 20)),
 		Patronymic:  capitalizer.String(generateRandomString(0, 10)),
 		Nationality: strings.ToTitle(generateRandomString(2, 2)),
 		Sex:         sex,
-		Age:         rand.Int() % 120,
+		Age:         rand.Int() % 120, //nolint:gosec
 		ID:          uuid.New(),
 	}
 }
@@ -173,8 +204,9 @@ func TestGet(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "not found",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				request := makeGetRequest(uuid.New())
+
 				return request, func(response *http.Response) {
 					checkNoBody(t, response)
 				}
@@ -183,8 +215,9 @@ func TestGet(t *testing.T) {
 		},
 		{
 			name: "invalid ID",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				request := makeGetRequest("124390845")
+
 				return request, func(response *http.Response) {
 					pattern := regexp.MustCompile("Invalid format for parameter personID")
 					checkStringBody(t, response, pattern)
@@ -194,7 +227,7 @@ func TestGet(t *testing.T) {
 		},
 		{
 			name: "found",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				person := makePerson()
 				personID, err := people.Create(context.Background(), &person)
 				if err != nil {
@@ -211,6 +244,7 @@ func TestGet(t *testing.T) {
 					Sex:         api.Sex(person.Sex),
 					Surname:     person.Surname,
 				}
+
 				return request, func(response *http.Response) {
 					checkBody(t, response, body)
 				}
@@ -232,15 +266,16 @@ func TestDelete(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "not found",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				return makeDeleteRequest(uuid.New()), nil
 			},
 			status: http.StatusNotFound,
 		},
 		{
 			name: "invalid ID",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				request := makeDeleteRequest("20934822")
+
 				return request, func(response *http.Response) {
 					pattern := regexp.MustCompile("Invalid format for parameter personID")
 					checkStringBody(t, response, pattern)
@@ -250,12 +285,13 @@ func TestDelete(t *testing.T) {
 		},
 		{
 			name: "valid",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				person := makePerson()
 				personID, err := people.Create(context.Background(), &person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
+
 				return makeDeleteRequest(personID), func(response *http.Response) {
 					checkNoBody(t, response)
 					_, err := people.GetByID(context.Background(), personID)
@@ -271,24 +307,29 @@ func TestDelete(t *testing.T) {
 	subtests(t, testCases)
 }
 
+//nolint:funlen
 func TestPut(t *testing.T) {
 	t.Parallel()
 
-	makePutRequest := func(id any, body *api.PersonPutJSONRequestBody) *http.Request {
+	makePutRequest := func(personID any, body *api.PersonPutJSONRequestBody) *http.Request {
 		var reader io.Reader
+
 		if body != nil {
 			data, err := json.Marshal(*body)
 			if err != nil {
 				t.Fatalf("could not marshal put body: %v", err)
 			}
+
 			reader = bytes.NewReader(data)
 		}
+
 		request := httptest.NewRequest(
 			http.MethodPut,
-			fmt.Sprintf("/person/%s", id),
+			fmt.Sprintf("/person/%s", personID),
 			reader,
 		)
 		request.Header.Set("Content-Type", "application/json")
+
 		return request
 	}
 
@@ -302,14 +343,16 @@ func TestPut(t *testing.T) {
 			Sex:         api.Sex(person.Sex),
 			Surname:     person.Surname,
 		}
+
 		return body
 	}
 
 	testCases := []testCase{
 		{
 			name: "not found",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				body := makeBody()
+
 				return makePutRequest(uuid.New(), &body), func(response *http.Response) {
 					checkNoBody(t, response)
 				}
@@ -318,9 +361,10 @@ func TestPut(t *testing.T) {
 		},
 		{
 			name: "invalid ID",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				body := makeBody()
 				request := makePutRequest("20934822", &body)
+
 				return request, func(response *http.Response) {
 					pattern := regexp.MustCompile("Invalid format for parameter personID")
 					checkStringBody(t, response, pattern)
@@ -330,7 +374,7 @@ func TestPut(t *testing.T) {
 		},
 		{
 			name: "valid",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				person := makePerson()
 				personID, err := people.Create(context.Background(), &person)
 				if err != nil {
@@ -345,6 +389,7 @@ func TestPut(t *testing.T) {
 					Sex:         api.Sex(newPerson.Sex),
 					Surname:     newPerson.Surname,
 				})
+
 				return request, func(response *http.Response) {
 					checkNoBody(t, response)
 
@@ -366,37 +411,43 @@ func TestPut(t *testing.T) {
 	subtests(t, testCases)
 }
 
+//nolint:funlen
 func TestPost(t *testing.T) {
 	t.Parallel()
 
 	makePostRequest := func(body any) *http.Request {
 		var reader io.Reader
+
 		if body != nil {
 			data, err := json.Marshal(body)
 			if err != nil {
 				t.Fatalf("could not marshal put body: %v", err)
 			}
+
 			reader = bytes.NewReader(data)
 		}
+
 		request := httptest.NewRequest(
 			http.MethodPost,
 			"/person",
 			reader,
 		)
 		request.Header.Set("Content-Type", "application/json")
+
 		return request
 	}
 
 	testCases := []testCase{
 		{
 			name: "valid",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				person := makePerson()
 				request := makePostRequest(api.PersonPostJSONRequestBody{
 					Name:       person.Name,
 					Patronymic: person.Patronymic,
 					Surname:    person.Surname,
 				})
+
 				return request, func(response *http.Response) {
 					personID := unmarshalJSONBody[api.PersonPost201JSONResponse](t, response)
 
@@ -417,13 +468,14 @@ func TestPost(t *testing.T) {
 		},
 		{
 			name: "invalid body",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				requestBody := `{"name":"Quux","surname":"Buzz"}`
 				request := httptest.NewRequest(
 					http.MethodPost,
 					"/person",
 					strings.NewReader(requestBody))
 				request.Header.Set("Content-Type", "application/json")
+
 				return request, func(response *http.Response) {
 					checkStringBody(t, response, regexp.MustCompile(`property "patronymic" is missing`))
 				}
@@ -435,43 +487,52 @@ func TestPost(t *testing.T) {
 	subtests(t, testCases)
 }
 
+//nolint:funlen
 func TestPatch(t *testing.T) {
 	t.Parallel()
 
-	makePatchRequest := func(id any, body any) *http.Request {
+	makePatchRequest := func(personID any, body any) *http.Request {
 		var reader io.Reader
+
 		if body != nil {
 			data, err := json.Marshal(body)
 			if err != nil {
 				t.Fatalf("could not marshal put body: %v", err)
 			}
+
 			reader = bytes.NewReader(data)
 		}
+
 		request := httptest.NewRequest(
 			http.MethodPatch,
-			fmt.Sprintf("/person/%s", id),
+			fmt.Sprintf("/person/%s", personID),
 			reader,
 		)
 		request.Header.Set("Content-Type", "application/json")
+
 		return request
 	}
 
 	testCases := []testCase{
 		{
 			name: "not found",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				newAge := 60
-				return makePatchRequest(uuid.New(), api.PersonPatchJSONRequestBody{
-					Age: &newAge,
-				}), nil
+
+				return makePatchRequest(uuid.New(), api.PersonPatchJSONRequestBody{ //nolint:exhaustruct
+						Age: &newAge,
+					}), func(response *http.Response) {
+						checkStringBody(t, response, regexp.MustCompile(`not found`))
+					}
 			},
 			status: http.StatusNotFound,
 		},
 		{
 			name: "invalid ID",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, _ repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				newAge := 60
-				return makePatchRequest("quux", api.PersonPatchJSONRequestBody{
+
+				return makePatchRequest("quux", api.PersonPatchJSONRequestBody{ //nolint:exhaustruct
 						Age: &newAge,
 					}), func(response *http.Response) {
 						checkStringBody(t, response, regexp.MustCompile(`Invalid format for parameter personID`))
@@ -481,16 +542,17 @@ func TestPatch(t *testing.T) {
 		},
 		{
 			name: "valid age update",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				person := makePerson()
 				personID, err := people.Create(context.Background(), &person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
 				newAge := person.Age / 2
-				request := makePatchRequest(personID, api.PersonPatchJSONRequestBody{
+				request := makePatchRequest(personID, api.PersonPatchJSONRequestBody{ //nolint:exhaustruct
 					Age: &newAge,
 				})
+
 				return request, func(response *http.Response) {
 					checkNoBody(t, response)
 
@@ -531,21 +593,27 @@ func makeListRequest(personFilter domain.PersonFilter, paginationFilter *domain.
 	if personFilter.Sex != nil {
 		values.Add("sex", string(*personFilter.Sex))
 	}
+
 	if personFilter.AgeMin != nil {
 		values.Add("age_min", strconv.Itoa(*personFilter.AgeMin))
 	}
+
 	if personFilter.AgeMax != nil {
 		values.Add("age_max", strconv.Itoa(*personFilter.AgeMax))
 	}
+
 	if personFilter.Nationality != nil {
 		values.Add("nationality", *personFilter.Nationality)
 	}
+
 	if personFilter.NameFragment != nil {
 		values.Add("name", *personFilter.NameFragment)
 	}
+
 	if personFilter.PatronymicFragment != nil {
 		values.Add("patronymic", *personFilter.PatronymicFragment)
 	}
+
 	if personFilter.SurnameFragment != nil {
 		values.Add("surname", *personFilter.SurnameFragment)
 	}
@@ -559,9 +627,11 @@ func makeListRequest(personFilter domain.PersonFilter, paginationFilter *domain.
 	if q := values.Encode(); len(q) != 0 {
 		path += "?" + q
 	}
+
 	return httptest.NewRequest(http.MethodGet, path, nil)
 }
 
+//nolint:funlen
 func TestList(t *testing.T) {
 	t.Parallel()
 
@@ -577,10 +647,13 @@ func TestList(t *testing.T) {
 	testCases := []testCase{
 		{
 			name: "valid",
-			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) {
+			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
 				minAge := 20
 				nameFragment := "a"
-				personFilter := domain.PersonFilter{AgeMin: &minAge, NameFragment: &nameFragment}
+				personFilter := domain.PersonFilter{ //nolint:exhaustruct
+					AgeMin:       &minAge,
+					NameFragment: &nameFragment,
+				}
 				paginationFilter := domain.PaginationFilter{Limit: 2, Offset: 1}
 
 				var expected domain.Page[*domain.Person]

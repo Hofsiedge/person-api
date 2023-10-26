@@ -158,19 +158,19 @@ paths:
     get:
       operationId: personList
       parameters:
-        - description: Part of Person's name (case-insensitive)
+        - description: Person's name (case-insensitive, similarity search)
           in: query
           name: name
           schema:
             minLength: 1
             type: string
-        - description: Part of Person's surname (case-insensitive)
+        - description: Person's surname (case-insensitive, similarity search)
           in: query
           name: surname
           schema:
             minLength: 1
             type: string
-        - description: Part of Person's patronymic (case-insensitive, empty for no patronymic)
+        - description: Part of Person's patronymic (case-insensitive, similarity search, empty for no patronymic)
           in: query
           name: patronymic
           schema:
@@ -196,6 +196,14 @@ paths:
           name: sex
           schema:
             $ref: '#/components/schemas/Sex'
+        - description: Threshold for similarity search (0.0 to 1.0)
+          in: query
+          name: threshold
+          schema:
+            default: 0.5
+            maximum: 1.0
+            minimum: 0.0
+            type: number
         - description: The number of records to skip
           in: query
           name: offset
@@ -221,7 +229,7 @@ paths:
           description: Invalid query parameters
         '5XX':
           $ref: '#/components/responses/5XXInternalServerError'
-      summary: List Person records    
+      summary: List Person records
 
     post:
       operationId: personPost

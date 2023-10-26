@@ -29,34 +29,65 @@
         scripts = with builtins;
           attrValues (mapAttrs pkgs.writeShellScriptBin {
             preview-readme = ''
-              ${pkgs.python311Packages.grip}/bin/grip README.md
+              ${pkgs.python311Packages.grip}/bin/grip $ROOT/README.md
             '';
-            render-api-docs = ''
-              redocly lint openapi.yaml                          && \
-              redocly build-docs openapi.yaml -o docs/api.html   && \
-              ${formatted-echo fmt.bold_green "Generated docs!"} || \
-              ${formatted-echo fmt.bold_red "Invalid API spec"}
+            generate-from-openapi = ''
+              {
+                redocly lint $ROOT/openapi.yaml                    && \
+                redocly build-docs $ROOT/openapi.yaml \
+                        -o $ROOT/docs/api.html                     && \
+                ${formatted-echo fmt.bold_green "Generated docs!"} || \
+                ${formatted-echo fmt.bold_red "Invalid API spec"}
+              } && {
+                pushd $ROOT/src > /dev/null
+                go generate ./...
+                popd > /dev/null
+              } &&
+              ${formatted-echo fmt.bold_green "Generated Go files!"}   || \
+              ${formatted-echo fmt.bold_red "Error generating Go files"}
             '';
             # if you want to reinstall the tools that are not
             # managed by nix, run this and re-enter nix shell
             remove-non-nix-tools = ''
-              sudo rm -rf .nix-node .nix-go
+              sudo rm -rf $ROOT/.nix-node $ROOT/.nix-go
             '';
             test-server = ''
-              pushd src
+              pushd $ROOT/src > /dev/null
               CGO_ENABLED=1 go test -race -vet="" -coverpkg=./... \
                 -coverprofile=cover.out ./...
               go tool cover -html=cover.out -o cover.html
-              popd
+              popd > /dev/null
+            '';
+            test-database = ''
+              docker compose \
+                --file $ROOT/compose.yaml \
+                --file $ROOT/compose.db-test.yaml \
+                --profile db-test \
+                --env-file $ROOT/.env \
+                run db --rm --build
+            '';
+            wrapped-migrate = ''
+              set -a
+              source $ROOT/.env
+              set +a
+              migrate \
+                -source file://postgres/migrations \
+                -database "postgres://$DB_USERNAME:$DB_PASSWORD@localhost:5432/$DB_NAME?sslmode=disable" \
+                $@
             '';
           });
         tools = with pkgs; [
           git
+
+          # go
           go_1_21
           golangci-lint
           gotools
           go-tools
-          impl
+
+          #sql
+          go-migrate
+          sqlfluff
 
           # for redocly
           nodejs_latest
@@ -66,6 +97,8 @@
           name = "test-project";
           buildInputs = tools ++ scripts;
           shellHook = ''
+            export ROOT=$PWD
+
             # git setup
             git config core.hooksPath .githooks
 

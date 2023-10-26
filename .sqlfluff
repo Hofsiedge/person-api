@@ -1,0 +1,32 @@
+[sqlfluff]
+dialect = postgres
+
+[sqlfluff:indentation]
+skip_indentation_in = 
+
+[sqlfluff:layout:type:dot]
+spacing_before = touch
+spacing_after = touch
+
+[sqlfluff:layout:type:column]
+spacing_before = align
+align_within = statement
+align_scope = file
+
+[sqlfluff:layout:type:column_definition]
+spacing_before = align
+align_within = statement
+align_scope = file
+
+[sqlfluff:layout:type:column_constraint_segment]
+spacing_before = align
+align_within = statement
+align_scope = file
+
+[sqlfluff:layout:type:data_type]
+spacing_before = align
+align_within = statement
+align_scope = file
+
+[sqlfluff:rules:capitalisation.keywords]
+capitalisation_policy = upper

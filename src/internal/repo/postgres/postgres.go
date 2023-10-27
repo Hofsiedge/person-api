@@ -103,8 +103,31 @@ func (*People) FullUpdate(ctx context.Context, id uuid.UUID, replacement domain.
 }
 
 // GetByID implements repo.PersonRepo.
-func (*People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, error) {
-	panic("unimplemented")
+func (p *People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, error) {
+	var pgErr *pgconn.PgError
+
+	rows, err := p.db.Query(ctx, `select * from people.get_person($1)`, id)
+	if err != nil {
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case pgerrcode.NoDataFound:
+				return domain.Person{}, repo.ErrNotFound
+			case pgerrcode.InvalidParameterValue:
+				return domain.Person{}, repo.ErrArgument
+			}
+		}
+
+		return domain.Person{}, fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+	}
+
+	task, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Person])
+	if err != nil {
+		return domain.Person{}, fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+	}
+
+	abstract := task.ToAbstract()
+
+	return abstract, nil
 }
 
 // List implements repo.PersonRepo.

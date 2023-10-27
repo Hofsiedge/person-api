@@ -5,12 +5,13 @@ import (
 	"flag"
 	"log"
 	"os"
+	"reflect"
 	"testing"
 
 	"github.com/Hofsiedge/person-api/internal/config"
-	"github.com/Hofsiedge/person-api/internal/domain"
 	"github.com/Hofsiedge/person-api/internal/repo"
 	"github.com/Hofsiedge/person-api/internal/repo/postgres"
+	"github.com/Hofsiedge/person-api/internal/utils"
 )
 
 func TestIntegration(t *testing.T) {
@@ -20,21 +21,22 @@ func TestIntegration(t *testing.T) {
 
 	t.Parallel()
 
-	person := domain.Person{
-		Name:        "Name",
-		Surname:     "Surname",
-		Patronymic:  "Patronymic",
-		Nationality: "NA",
-		Sex:         domain.Male,
-		Age:         100,
-		ID:          [16]byte{},
-	}
+	person := utils.MakePerson()
 
 	var err error
 
 	person.ID, err = people.Create(context.Background(), person)
 	if err != nil {
 		t.Fatalf("could not create a Person: %v", err)
+	}
+
+	result, err := people.GetByID(context.Background(), person.ID)
+	if err != nil {
+		t.Errorf("could not get a Person: %v", err)
+	}
+
+	if !reflect.DeepEqual(person, result) {
+		t.Errorf("mismatch in GetByID result: expected %v, got %v", person, result)
 	}
 }
 

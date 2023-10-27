@@ -63,8 +63,7 @@ func TestCreate(t *testing.T) {
 	t.Parallel()
 
 	person := utils.MakePerson()
-	bytes, _ := person.ID.MarshalBinary()
-	validPgUUID := pgtype.UUID{Bytes: [16]byte(bytes), Valid: true}
+	validPgUUID := pgtype.UUID{Bytes: person.ID, Valid: true}
 	invalidPgUUID := pgtype.UUID{Bytes: [16]byte{}, Valid: false}
 
 	personEmptyName := person
@@ -145,4 +144,61 @@ func TestCreate(t *testing.T) {
 		return repo.Create(context.Background(), person) //nolint:wrapcheck
 	}
 	testFunction[domain.Person, uuid.UUID](t, testCases, wrapper)
+}
+
+func TestGet(t *testing.T) {
+	t.Parallel()
+
+	person := utils.MakePerson()
+	pgPerson := postgres.ToConcrete(person)
+
+	//nolint:exhaustruct
+	testCases := []testCaseData[uuid.UUID, domain.Person]{
+		{
+			name: "valid",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery(`^select \* from people.get_person`).
+					WithArgs(person.ID).
+					WillReturnRows(
+						mock.NewRows([]string{
+							"person_id", "name", "surname", "patronymic",
+							"age", "sex", "nationality",
+						}).AddRow(
+							pgPerson.PersonID, pgPerson.Name, pgPerson.Surname,
+							pgPerson.Patronymic, pgPerson.Age, pgPerson.Sex,
+							pgPerson.Nationality,
+						),
+					)
+			},
+			input:  person.ID,
+			expect: person,
+		},
+		{
+			name: "not found",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery(`^select \* from people.get_person`).
+					WithArgs(person.ID).
+					WillReturnError(&pgconn.PgError{Code: pgerrcode.NoDataFound})
+			},
+			input: person.ID,
+			error: repo.ErrNotFound,
+		},
+		{
+			name: "unexpected error",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectQuery(`^select \* from people.get_person`).
+					WithArgs(person.ID).
+					WillReturnRows(mock.NewRows([]string{"unexpected_column"}).AddRow(person.ID))
+			},
+			input: person.ID,
+			error: repo.ErrUnexpected,
+		},
+	}
+
+	wrapper := func(mock pgxmock.PgxPoolIface, personID uuid.UUID) (domain.Person, error) {
+		repo := postgres.PeopleFromPgxPoolInterface(mock)
+
+		return repo.GetByID(context.Background(), personID) //nolint:wrapcheck
+	}
+	testFunction[uuid.UUID, domain.Person](t, testCases, wrapper)
 }

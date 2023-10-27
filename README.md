@@ -96,6 +96,7 @@ git hook run pre-commit
 
 ## Integration testing
 To test integration of server and DB:
-1. Run `docker compose --profile dev up` to start dev DB instance.
+1. Run `docker compose --profile dev up` to start dev DB instance
+2. Wait for migrations to finish
 2. Run `test-server-database-integration` from nix shell (or run equivalent commands)
 3. Stop the DB and remove the volumes: `docker compose --profile dev down -v`

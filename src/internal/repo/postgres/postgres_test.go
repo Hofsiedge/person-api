@@ -229,12 +229,12 @@ func TestGet(t *testing.T) {
 	testFunction[uuid.UUID, domain.Person](t, testCases, wrapper)
 }
 
-//nolint:exhaustruct
 func TestDelete(t *testing.T) {
 	t.Parallel()
 
 	personID := uuid.New()
 
+	//nolint:exhaustruct
 	testCases := []testCaseData[uuid.UUID, struct{}]{
 		{
 			name: "delete non-existent person",
@@ -261,4 +261,44 @@ func TestDelete(t *testing.T) {
 		return postgres.PeopleFromPgxPoolInterface(mock).Delete(context.Background(), id) //nolint:wrapcheck
 	}
 	testProcedure[uuid.UUID](t, testCases, wrapper)
+}
+
+func TestPartialUpdate(t *testing.T) {
+	t.Parallel()
+
+	person := utils.MakePerson()
+	partial := domain.PersonPartial{
+		Name:        &person.Name,
+		Surname:     &person.Surname,
+		Patronymic:  &person.Patronymic,
+		Nationality: &person.Nationality,
+		Sex:         &person.Sex,
+		Age:         &person.Age,
+	}
+
+	type inputs struct {
+		id          uuid.UUID
+		replacement domain.PersonPartial
+	}
+
+	//nolint:exhaustruct
+	testCases := []testCaseData[inputs, struct{}]{
+		{
+			name: "update existing person's name",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec(`^select people.update_person`).
+					WithArgs(
+						person.ID, person.Name, nil, nil,
+						nil, nil, nil).
+					WillReturnResult(pgxmock.NewResult("SELECT", 1))
+			},
+			input: inputs{person.ID, partial},
+		},
+	}
+
+	wrapper := func(mock pgxmock.PgxPoolIface, in inputs) error {
+		return postgres.PeopleFromPgxPoolInterface(mock).PartialUpdate(context.Background(), //nolint:wrapcheck
+			in.id, in.replacement)
+	}
+	testProcedure[inputs](t, testCases, wrapper)
 }

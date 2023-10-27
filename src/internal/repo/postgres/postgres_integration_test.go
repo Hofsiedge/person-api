@@ -10,11 +10,13 @@ import (
 	"testing"
 
 	"github.com/Hofsiedge/person-api/internal/config"
+	"github.com/Hofsiedge/person-api/internal/domain"
 	"github.com/Hofsiedge/person-api/internal/repo"
 	"github.com/Hofsiedge/person-api/internal/repo/postgres"
 	"github.com/Hofsiedge/person-api/internal/utils"
 )
 
+//nolint:funlen,cyclop
 func TestIntegration(t *testing.T) {
 	if !runIntegrationTests {
 		t.SkipNow()
@@ -26,7 +28,7 @@ func TestIntegration(t *testing.T) {
 
 	var err error
 
-	// create
+	// create (POST)
 	person.ID, err = people.Create(context.Background(), person)
 	if err != nil {
 		t.Fatalf("could not create a Person: %v", err)
@@ -36,20 +38,52 @@ func TestIntegration(t *testing.T) {
 	result, err := people.GetByID(context.Background(), person.ID)
 	if err != nil {
 		t.Errorf("could not get a Person: %v", err)
+	} else if !reflect.DeepEqual(person, result) {
+		t.Errorf("mismatch in GetByID result: expected %v, got %v", person, result)
 	}
 
-	if !reflect.DeepEqual(person, result) {
-		t.Errorf("mismatch in GetByID result: expected %v, got %v", person, result)
+	// replace (PUT)
+	anotherPerson := utils.MakePerson()
+	if err = people.FullUpdate(context.Background(), person.ID, anotherPerson); err != nil {
+		t.Errorf("could not replace a Person: %v", err)
+	} else {
+		anotherPerson.ID = person.ID
+
+		result, err = people.GetByID(context.Background(), person.ID)
+		if err != nil {
+			t.Fatalf("could not get a Person after replacement: %v", err)
+		}
+
+		if !reflect.DeepEqual(result, anotherPerson) {
+			t.Errorf("replacement was not saved: expected %v, got %v", anotherPerson, result)
+		}
+	}
+
+	// update
+	yetAnotherPerson := utils.MakePerson()
+	partial := domain.PersonPartial{Name: &yetAnotherPerson.Name} //nolint:exhaustruct
+
+	if err = people.PartialUpdate(context.Background(), person.ID, partial); err != nil {
+		t.Errorf("could not update a Person: %v", err)
+	} else {
+		anotherPerson.Name = yetAnotherPerson.Name
+		result, err = people.GetByID(context.Background(), person.ID)
+		if err != nil {
+			t.Fatalf("could not get a Person after update: %v", err)
+		}
+		if !reflect.DeepEqual(result, anotherPerson) {
+			t.Errorf("update was not saved: expected %v, got %v", anotherPerson, result)
+		}
 	}
 
 	// delete
 	if err = people.Delete(context.Background(), person.ID); err != nil {
 		t.Errorf("could not delete a Person: %v", err)
-	}
-
-	_, err = people.GetByID(context.Background(), person.ID)
-	if !errors.Is(err, repo.ErrNotFound) {
-		t.Errorf("the Person was not deleted. error: %v", err)
+	} else {
+		_, err = people.GetByID(context.Background(), person.ID)
+		if !errors.Is(err, repo.ErrNotFound) {
+			t.Errorf("the Person was not deleted. error: %v", err)
+		}
 	}
 }
 

@@ -106,8 +106,15 @@ func (p *People) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // FullUpdate implements repo.PersonRepo.
-func (*People) FullUpdate(ctx context.Context, id uuid.UUID, replacement domain.Person) error {
-	panic("unimplemented")
+func (p *People) FullUpdate(ctx context.Context, id uuid.UUID, replacement domain.Person) error {
+	return p.PartialUpdate(ctx, id, domain.PersonPartial{
+		Name:        &replacement.Name,
+		Surname:     &replacement.Surname,
+		Patronymic:  &replacement.Patronymic,
+		Nationality: &replacement.Nationality,
+		Sex:         &replacement.Sex,
+		Age:         &replacement.Age,
+	})
 }
 
 // GetByID implements repo.PersonRepo.
@@ -133,6 +140,16 @@ func (*People) List(
 }
 
 // PartialUpdate implements repo.PersonRepo.
-func (*People) PartialUpdate(ctx context.Context, id uuid.UUID, partial domain.PersonPartial) error {
-	panic("unimplemented")
+func (p *People) PartialUpdate(ctx context.Context, id uuid.UUID, partial domain.PersonPartial) error {
+	_, err := p.db.Exec(ctx, `select people.update_person(
+			id => $1, name_ => $2, surname_ => $3, patronymic_ => $4,
+			age_ => $5, sex_ => $6, nationality_ => $7)`,
+		id, partial.Name, partial.Surname, partial.Patronymic,
+		partial.Age, partial.Sex, partial.Nationality,
+	)
+	if err != nil {
+		return wrapPostgresError(err)
+	}
+
+	return nil
 }

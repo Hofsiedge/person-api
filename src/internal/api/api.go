@@ -162,7 +162,7 @@ func (s *Server) PersonPost( //nolint:ireturn
 		ID:          [16]byte{},
 	}
 
-	personID, err := s.People.Create(ctx, &person)
+	personID, err := s.People.Create(ctx, person)
 	if err != nil {
 		switch {
 		case errors.Is(err, repo.ErrArgument):
@@ -186,7 +186,7 @@ func (s *Server) PersonPost( //nolint:ireturn
 func (s *Server) PersonPut( //nolint:ireturn
 	ctx context.Context, request PersonPutRequestObject,
 ) (PersonPutResponseObject, error) {
-	err := s.People.FullUpdate(ctx, request.PersonID, &domain.Person{
+	err := s.People.FullUpdate(ctx, request.PersonID, domain.Person{
 		Name:        request.Body.Name,
 		Surname:     request.Body.Surname,
 		Patronymic:  request.Body.Patronymic,

@@ -75,6 +75,15 @@
                 -database "postgres://$DB_USERNAME:$DB_PASSWORD@localhost:5432/$DB_NAME?sslmode=disable" \
                 $@
             '';
+            test-server-database-integration = ''
+              set -a
+              source $ROOT/.env
+              set +a
+              pushd $ROOT/src
+              export DB_CONN="postgres://$DB_USERNAME:$DB_PASSWORD@localhost:5432/$DB_NAME"
+              go test internal/repo/postgres/postgres_integration_test.go -integration true
+              popd
+            '';
           });
         tools = with pkgs; [
           git

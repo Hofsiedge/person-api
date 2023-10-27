@@ -27,14 +27,10 @@ func New() *People {
 }
 
 // Create implements repo.Repo.
-func (p *People) Create(ctx context.Context, obj *domain.Person) (uuid.UUID, error) {
-	if obj == nil {
-		return uuid.UUID{}, repo.ErrArgument
-	}
-
+func (p *People) Create(ctx context.Context, obj domain.Person) (uuid.UUID, error) {
 	id := uuid.New()
 	obj.ID = id
-	p.People[id] = *obj
+	p.People[id] = obj
 
 	return id, nil
 }
@@ -51,12 +47,12 @@ func (p *People) Delete(ctx context.Context, id uuid.UUID) error {
 }
 
 // FullUpdate implements repo.Repo.
-func (p *People) FullUpdate(ctx context.Context, personID uuid.UUID, replacement *domain.Person) error {
+func (p *People) FullUpdate(ctx context.Context, personID uuid.UUID, replacement domain.Person) error {
 	if _, found := p.People[personID]; !found {
 		return repo.ErrNotFound
 	}
 
-	task := *replacement
+	task := replacement
 	task.ID = personID
 	p.People[personID] = task
 
@@ -64,13 +60,13 @@ func (p *People) FullUpdate(ctx context.Context, personID uuid.UUID, replacement
 }
 
 // GetByID implements repo.Repo.
-func (p *People) GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error) {
+func (p *People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, error) {
 	task, found := p.People[id]
 	if !found {
-		return nil, repo.ErrNotFound
+		return domain.Person{}, repo.ErrNotFound
 	}
 
-	return &task, nil
+	return task, nil
 }
 
 //nolint:cyclop
@@ -101,7 +97,7 @@ func personMatches(filter domain.PersonFilter, person domain.Person) bool {
 // List implements repo.Repo.
 func (p *People) List(
 	ctx context.Context, filter domain.PersonFilter, pagination domain.PaginationFilter,
-) (domain.Page[*domain.Person], error) {
+) (domain.Page[domain.Person], error) {
 	keys := make([]uuid.UUID, 0)
 	for key := range p.People {
 		keys = append(keys, key)
@@ -111,7 +107,7 @@ func (p *People) List(
 		return strings.Compare(a.String(), b.String())
 	})
 
-	result := make([]*domain.Person, 0)
+	result := make([]domain.Person, 0)
 	recordIndex := 0
 
 	for _, id := range keys {
@@ -122,12 +118,12 @@ func (p *People) List(
 		}
 
 		if (recordIndex >= pagination.Offset) && (recordIndex < pagination.Offset+pagination.Limit) {
-			result = append(result, &person)
+			result = append(result, person)
 		}
 		recordIndex++
 	}
 
-	page := domain.Page[*domain.Person]{
+	page := domain.Page[domain.Person]{
 		Items:         result,
 		CurrentLimit:  pagination.Limit,
 		CurrentOffset: pagination.Offset,

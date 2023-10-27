@@ -1,6 +1,6 @@
-BEGIN;
+begin;
 
-DROP FUNCTION utils.in_test_environment();
-DROP SCHEMA utils;
+drop function utils.in_test_environment();
+drop schema utils;
 
-COMMIT;
+commit;

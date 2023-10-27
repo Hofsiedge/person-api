@@ -1,12 +1,12 @@
-BEGIN;
+begin;
 
-CREATE SCHEMA utils;
+create schema utils;
 
-CREATE FUNCTION utils.in_test_environment()
-RETURNS boolean
-AS $sql$
-    SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = 'test');
+create function utils.in_test_environment()
+returns boolean
+as $sql$
+    select exists (select 1 from pg_namespace where nspname = 'test');
 $sql$
-LANGUAGE sql;
+language sql;
 
-COMMIT;
+commit;

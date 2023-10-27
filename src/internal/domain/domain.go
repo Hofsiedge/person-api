@@ -21,8 +21,8 @@ type Person struct {
 	ID          uuid.UUID
 }
 
-func (t *Person) GetID() uuid.UUID {
-	return t.ID
+func (p Person) GetID() uuid.UUID {
+	return p.ID
 }
 
 type PersonPartial struct {

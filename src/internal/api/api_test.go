@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
-	"math/rand"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,10 +22,9 @@ import (
 	"github.com/Hofsiedge/person-api/internal/domain"
 	"github.com/Hofsiedge/person-api/internal/repo"
 	"github.com/Hofsiedge/person-api/internal/repo/mock"
+	"github.com/Hofsiedge/person-api/internal/utils"
 	"github.com/google/uuid"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
-	"golang.org/x/text/cases"
-	"golang.org/x/text/language"
 )
 
 type testCase struct {
@@ -160,40 +158,6 @@ func serve(t *testing.T, request *http.Request, people repo.PersonRepo) *http.Re
 	return result
 }
 
-//nolint:gosec
-func generateRandomString(minLength, maxLength uint) string {
-	const letters = "abcdefghijklmnopqrstuvwxyz"
-
-	var builder strings.Builder
-
-	length := minLength + (uint(rand.Int()) % (maxLength + 1 - minLength))
-	for i := 0; i < int(length); i++ {
-		letter := letters[rand.Int()%len(letters)]
-		builder.WriteByte(letter)
-	}
-
-	return builder.String()
-}
-
-func makePerson() domain.Person {
-	capitalizer := cases.Title(language.Und)
-
-	sex := domain.Male
-	if rand.Float32() < 0.5 { //nolint:gosec
-		sex = domain.Female
-	}
-
-	return domain.Person{
-		Name:        capitalizer.String(generateRandomString(2, 10)),
-		Surname:     capitalizer.String(generateRandomString(2, 20)),
-		Patronymic:  capitalizer.String(generateRandomString(0, 10)),
-		Nationality: strings.ToTitle(generateRandomString(2, 2)),
-		Sex:         sex,
-		Age:         rand.Int() % 120, //nolint:gosec
-		ID:          uuid.New(),
-	}
-}
-
 func TestGet(t *testing.T) {
 	t.Parallel()
 
@@ -228,8 +192,8 @@ func TestGet(t *testing.T) {
 		{
 			name: "found",
 			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
-				person := makePerson()
-				personID, err := people.Create(context.Background(), &person)
+				person := utils.MakePerson()
+				personID, err := people.Create(context.Background(), person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
@@ -286,8 +250,8 @@ func TestDelete(t *testing.T) {
 		{
 			name: "valid",
 			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
-				person := makePerson()
-				personID, err := people.Create(context.Background(), &person)
+				person := utils.MakePerson()
+				personID, err := people.Create(context.Background(), person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
@@ -334,7 +298,7 @@ func TestPut(t *testing.T) {
 	}
 
 	makeBody := func() api.PersonPutJSONRequestBody {
-		person := makePerson()
+		person := utils.MakePerson()
 		body := api.PersonPutJSONRequestBody{
 			Age:         person.Age,
 			Name:        person.Name,
@@ -375,12 +339,12 @@ func TestPut(t *testing.T) {
 		{
 			name: "valid",
 			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
-				person := makePerson()
-				personID, err := people.Create(context.Background(), &person)
+				person := utils.MakePerson()
+				personID, err := people.Create(context.Background(), person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
-				newPerson := makePerson()
+				newPerson := utils.MakePerson()
 				request := makePutRequest(personID, &api.PersonPutJSONRequestBody{
 					Age:         newPerson.Age,
 					Name:        newPerson.Name,
@@ -398,7 +362,7 @@ func TestPut(t *testing.T) {
 						t.Fatalf("could not get new value: %v", err)
 					}
 					newPerson.ID = personID
-					if !reflect.DeepEqual(newPerson, *personAfter) {
+					if !reflect.DeepEqual(newPerson, personAfter) {
 						t.Errorf("replaced person does not match the provided value: expected %v, got %v",
 							newPerson, personAfter)
 					}
@@ -441,7 +405,7 @@ func TestPost(t *testing.T) {
 		{
 			name: "valid",
 			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
-				person := makePerson()
+				person := utils.MakePerson()
 				request := makePostRequest(api.PersonPostJSONRequestBody{
 					Name:       person.Name,
 					Patronymic: person.Patronymic,
@@ -522,7 +486,7 @@ func TestPatch(t *testing.T) {
 				return makePatchRequest(uuid.New(), api.PersonPatchJSONRequestBody{ //nolint:exhaustruct
 						Age: &newAge,
 					}), func(response *http.Response) {
-						checkStringBody(t, response, regexp.MustCompile(`not found`))
+						checkNoBody(t, response)
 					}
 			},
 			status: http.StatusNotFound,
@@ -543,8 +507,8 @@ func TestPatch(t *testing.T) {
 		{
 			name: "valid age update",
 			init: func(t *testing.T, people repo.PersonRepo) (*http.Request, func(response *http.Response)) { //nolint:thelper
-				person := makePerson()
-				personID, err := people.Create(context.Background(), &person)
+				person := utils.MakePerson()
+				personID, err := people.Create(context.Background(), person)
 				if err != nil {
 					t.Fatalf("error initializing repo: %v", err)
 				}
@@ -637,8 +601,8 @@ func TestList(t *testing.T) {
 
 	fillDB := func(people repo.PersonRepo) {
 		for i := 0; i < 100; i++ {
-			person := makePerson()
-			if _, err := people.Create(context.Background(), &person); err != nil {
+			person := utils.MakePerson()
+			if _, err := people.Create(context.Background(), person); err != nil {
 				t.Fatalf("error initializing repo: %v", err)
 			}
 		}
@@ -656,7 +620,7 @@ func TestList(t *testing.T) {
 				}
 				paginationFilter := domain.PaginationFilter{Limit: 2, Offset: 1}
 
-				var expected domain.Page[*domain.Person]
+				var expected domain.Page[domain.Person]
 				// fill DB until there is enough to fill a page
 				for {
 					fillDB(people)

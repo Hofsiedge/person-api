@@ -27,6 +27,7 @@ type testCaseData[I any, O comparable] struct {
 
 type (
 	funcWrapper[I any, O comparable] func(pgxmock.PgxPoolIface, I) (O, error)
+	procWrapper[I any]               func(pgxmock.PgxPoolIface, I) error
 )
 
 func testFunction[I any, O comparable](t *testing.T, testCases []testCaseData[I, O], wrapper funcWrapper[I, O]) {
@@ -51,6 +52,31 @@ func testFunction[I any, O comparable](t *testing.T, testCases []testCaseData[I,
 		}
 
 		if err := mock.ExpectationsWereMet(); err != nil {
+			t.Errorf("there were unfulfilled expectations: %s", err)
+		}
+
+		mock.Close()
+	}
+}
+
+func testProcedure[I any](t *testing.T, testCases []testCaseData[I, struct{}], wrapper procWrapper[I]) {
+	t.Helper()
+
+	for _, test := range testCases {
+		mock, err := pgxmock.NewPool()
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		test.setExpectations(mock)
+
+		err = wrapper(mock, test.input)
+
+		if !errors.Is(err, test.error) {
+			t.Errorf("%s - error mismatch: expected %v, got %v", test.name, test.error, err)
+		}
+
+		if err = mock.ExpectationsWereMet(); err != nil {
 			t.Errorf("there were unfulfilled expectations: %s", err)
 		}
 
@@ -201,4 +227,38 @@ func TestGet(t *testing.T) {
 		return repo.GetByID(context.Background(), personID) //nolint:wrapcheck
 	}
 	testFunction[uuid.UUID, domain.Person](t, testCases, wrapper)
+}
+
+//nolint:exhaustruct
+func TestDelete(t *testing.T) {
+	t.Parallel()
+
+	personID := uuid.New()
+
+	testCases := []testCaseData[uuid.UUID, struct{}]{
+		{
+			name: "delete non-existent person",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec(`^select people.delete_person`).
+					WithArgs(personID).
+					WillReturnError(&pgconn.PgError{Code: pgerrcode.NoDataFound})
+			},
+			input: personID,
+			error: repo.ErrNotFound,
+		},
+		{
+			name: "delete existing person",
+			setExpectations: func(mock pgxmock.PgxPoolIface) {
+				mock.ExpectExec(`^select people.delete_person`).
+					WithArgs(personID).
+					WillReturnResult(pgxmock.NewResult("SELECT", 1))
+			},
+			input: personID,
+		},
+	}
+
+	wrapper := func(mock pgxmock.PgxPoolIface, id uuid.UUID) error {
+		return postgres.PeopleFromPgxPoolInterface(mock).Delete(context.Background(), id) //nolint:wrapcheck
+	}
+	testProcedure[uuid.UUID](t, testCases, wrapper)
 }

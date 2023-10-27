@@ -2,6 +2,7 @@ package postgres_test
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"log"
 	"os"
@@ -25,11 +26,13 @@ func TestIntegration(t *testing.T) {
 
 	var err error
 
+	// create
 	person.ID, err = people.Create(context.Background(), person)
 	if err != nil {
 		t.Fatalf("could not create a Person: %v", err)
 	}
 
+	// get
 	result, err := people.GetByID(context.Background(), person.ID)
 	if err != nil {
 		t.Errorf("could not get a Person: %v", err)
@@ -37,6 +40,16 @@ func TestIntegration(t *testing.T) {
 
 	if !reflect.DeepEqual(person, result) {
 		t.Errorf("mismatch in GetByID result: expected %v, got %v", person, result)
+	}
+
+	// delete
+	if err = people.Delete(context.Background(), person.ID); err != nil {
+		t.Errorf("could not delete a Person: %v", err)
+	}
+
+	_, err = people.GetByID(context.Background(), person.ID)
+	if !errors.Is(err, repo.ErrNotFound) {
+		t.Errorf("the Person was not deleted. error: %v", err)
 	}
 }
 

@@ -16,13 +16,6 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// sentient errors
-var (
-	ErrPostgresError            = errors.New("postgres error")
-	ErrCheckContsraintViolation = fmt.Errorf(
-		"%w: check constraint violation", ErrPostgresError)
-)
-
 // pgxpool.Pool / github.com/jackc/pgx/v5
 type PgxPoolInterface interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
@@ -61,6 +54,22 @@ func (p *People) Close() {
 // ensure that People implements repo.PersonRepo
 var _ repo.PersonRepo = &People{nil}
 
+func wrapPostgresError(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) {
+		switch pgErr.Code {
+		case pgerrcode.CheckViolation:
+			return fmt.Errorf("%w: %w", repo.ErrArgument, err)
+		case pgerrcode.NoDataFound:
+			return fmt.Errorf("%w: %w", repo.ErrNotFound, err)
+		case pgerrcode.InvalidParameterValue:
+			return fmt.Errorf("%w: %w", repo.ErrArgument, err)
+		}
+	}
+
+	return fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+}
+
 // Create implements repo.PersonRepo.
 func (p *People) Create(ctx context.Context, person domain.Person) (uuid.UUID, error) {
 	var personID pgtype.UUID
@@ -75,26 +84,25 @@ func (p *People) Create(ctx context.Context, person domain.Person) (uuid.UUID, e
 	)
 
 	if err := row.Scan(&personID); err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgerrcode.CheckViolation {
-			return uuid.UUID{}, fmt.Errorf(
-				"%w: failed a check constraint: %w", repo.ErrArgument, pgErr)
-		}
-
-		return uuid.UUID{}, fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+		return uuid.UUID{}, wrapPostgresError(err)
 	}
 
 	if !personID.Valid {
 		return uuid.UUID{}, fmt.Errorf(
-			"%w: todo.create_task returned NULL", repo.ErrUnexpected)
+			"%w: people.create_person returned NULL", repo.ErrUnexpected)
 	}
 
 	return personID.Bytes, nil
 }
 
 // Delete implements repo.PersonRepo.
-func (*People) Delete(ctx context.Context, id uuid.UUID) error {
-	panic("unimplemented")
+func (p *People) Delete(ctx context.Context, id uuid.UUID) error {
+	_, err := p.db.Exec(ctx, `select people.delete_person($1)`, id)
+	if err != nil {
+		return wrapPostgresError(err)
+	}
+
+	return nil
 }
 
 // FullUpdate implements repo.PersonRepo.
@@ -104,30 +112,17 @@ func (*People) FullUpdate(ctx context.Context, id uuid.UUID, replacement domain.
 
 // GetByID implements repo.PersonRepo.
 func (p *People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, error) {
-	var pgErr *pgconn.PgError
-
 	rows, err := p.db.Query(ctx, `select * from people.get_person($1)`, id)
 	if err != nil {
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case pgerrcode.NoDataFound:
-				return domain.Person{}, repo.ErrNotFound
-			case pgerrcode.InvalidParameterValue:
-				return domain.Person{}, repo.ErrArgument
-			}
-		}
-
-		return domain.Person{}, fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+		return domain.Person{}, wrapPostgresError(err)
 	}
 
-	task, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Person])
+	person, err := pgx.CollectOneRow(rows, pgx.RowToStructByName[Person])
 	if err != nil {
-		return domain.Person{}, fmt.Errorf("%w: %w", repo.ErrUnexpected, err)
+		return domain.Person{}, wrapPostgresError(err)
 	}
 
-	abstract := task.ToAbstract()
-
-	return abstract, nil
+	return person.ToAbstract(), nil
 }
 
 // List implements repo.PersonRepo.

@@ -21,8 +21,8 @@ type Person struct {
 	ID          uuid.UUID
 }
 
-func (t *Person) GetID() uuid.UUID {
-	return t.ID
+func (p Person) GetID() uuid.UUID {
+	return p.ID
 }
 
 type PersonPartial struct {
@@ -35,13 +35,14 @@ type PersonPartial struct {
 }
 
 type PersonFilter struct {
-	NameFragment       *string
-	SurnameFragment    *string
-	PatronymicFragment *string
-	Nationality        *string // TODO: separate type
-	Sex                *Sex
-	AgeMin             *int
-	AgeMax             *int
+	Name        *string
+	Surname     *string
+	Patronymic  *string
+	Nationality *string // TODO: separate type
+	Sex         *Sex
+	AgeMin      *int
+	AgeMax      *int
+	Threshold   *float32
 }
 
 type PaginationFilter struct {

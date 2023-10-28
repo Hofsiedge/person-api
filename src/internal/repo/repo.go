@@ -33,4 +33,4 @@ type Repo[T WithID[I], I comparable, P any, F any] interface {
 	Delete(ctx context.Context, id I) error
 }
 
-type PersonRepo Repo[*domain.Person, uuid.UUID, domain.PersonPartial, domain.PersonFilter]
+type PersonRepo Repo[domain.Person, uuid.UUID, domain.PersonPartial, domain.PersonFilter]

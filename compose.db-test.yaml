@@ -1,0 +1,20 @@
+# override for DB testing
+
+services:
+  db:
+    build:
+      args:
+        MIGRATE_VERSION:  4
+        PGTAP_VERSION:    v1.3.1
+        POSTGRES_VERSION: 16
+      context:    ./docker/db-test
+      dockerfile: Dockerfile
+    container_name: db-test        
+    tmpfs:
+      - /var/lib/postgresql/data:size=100M
+    volumes:
+      - db-test:/var/lib/postgresql/data
+      - ./postgres/migrations:/migrations
+
+volumes:
+  db-test:

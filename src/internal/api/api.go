@@ -3,7 +3,6 @@ package api
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -16,7 +15,12 @@ import (
 //go:generate oapi-codegen --config=spec.cfg.yaml   ../../../openapi.yaml
 
 // ensure that Server implements StrictServerInterface
-var _ StrictServerInterface = &Server{}
+var _ StrictServerInterface = &Server{
+	People: nil,
+	Logger: nil,
+}
+
+var ErrInit = errors.New("unexpected nil in argument list")
 
 // implements StrictServerInterface.
 type Server struct {
@@ -26,13 +30,16 @@ type Server struct {
 
 func New(repo repo.PersonRepo, logger *slog.Logger) (*Server, error) {
 	if repo == nil || logger == nil {
-		return nil, fmt.Errorf("unexpected nil in argument list")
+		return nil, ErrInit
 	}
+
 	return &Server{repo, logger}, nil
 }
 
 // PersonGet implements StrictServerInterface.
-func (s *Server) PersonGet(ctx context.Context, request PersonGetRequestObject) (PersonGetResponseObject, error) {
+func (s *Server) PersonGet( //nolint:ireturn
+	ctx context.Context, request PersonGetRequestObject,
+) (PersonGetResponseObject, error) {
 	person, err := s.People.GetByID(ctx, request.PersonID)
 	if err != nil {
 		switch {
@@ -43,6 +50,7 @@ func (s *Server) PersonGet(ctx context.Context, request PersonGetRequestObject) 
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
 				slog.String("error", err.Error()))
+
 			return PersonGet5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
@@ -59,16 +67,19 @@ func (s *Server) PersonGet(ctx context.Context, request PersonGetRequestObject) 
 }
 
 // PersonList implements StrictServerInterface.
-func (s *Server) PersonList(ctx context.Context, request PersonListRequestObject) (PersonListResponseObject, error) {
+func (s *Server) PersonList( //nolint:ireturn
+	ctx context.Context, request PersonListRequestObject,
+) (PersonListResponseObject, error) {
 	// TODO: test with nulls for paginaion
 	page, err := s.People.List(ctx, domain.PersonFilter{
-		NameFragment:       request.Params.Name,
-		SurnameFragment:    request.Params.Surname,
-		PatronymicFragment: request.Params.Patronymic,
-		Nationality:        request.Params.Nationality,
-		Sex:                (*domain.Sex)(request.Params.Sex),
-		AgeMin:             request.Params.AgeMin,
-		AgeMax:             request.Params.AgeMax,
+		Name:        request.Params.Name,
+		Surname:     request.Params.Surname,
+		Patronymic:  request.Params.Patronymic,
+		Nationality: request.Params.Nationality,
+		Sex:         (*domain.Sex)(request.Params.Sex),
+		AgeMin:      request.Params.AgeMin,
+		AgeMax:      request.Params.AgeMax,
+		Threshold:   request.Params.Threshold,
 	}, domain.PaginationFilter{
 		Offset: *request.Params.Offset,
 		Limit:  *request.Params.Limit,
@@ -81,9 +92,9 @@ func (s *Server) PersonList(ctx context.Context, request PersonListRequestObject
 			fallthrough
 		default:
 			return PersonList5XXResponse{http.StatusInternalServerError}, nil
-
 		}
 	}
+
 	people := make([]PersonFullWithID, len(page.Items))
 	for i, person := range page.Items {
 		people[i] = PersonFullWithID{
@@ -96,6 +107,7 @@ func (s *Server) PersonList(ctx context.Context, request PersonListRequestObject
 			Surname:     person.Surname,
 		}
 	}
+
 	return PersonList200JSONResponse{
 		Pagination: PaginationOffsetLimit{
 			CurrentLimit:  page.CurrentLimit,
@@ -107,7 +119,9 @@ func (s *Server) PersonList(ctx context.Context, request PersonListRequestObject
 }
 
 // PersonPatch implements StrictServerInterface.
-func (s *Server) PersonPatch(ctx context.Context, request PersonPatchRequestObject) (PersonPatchResponseObject, error) {
+func (s *Server) PersonPatch( //nolint:ireturn
+	ctx context.Context, request PersonPatchRequestObject,
+) (PersonPatchResponseObject, error) {
 	err := s.People.PartialUpdate(ctx, request.PersonID, domain.PersonPartial{
 		Name:        request.Body.Name,
 		Surname:     request.Body.Surname,
@@ -127,24 +141,29 @@ func (s *Server) PersonPatch(ctx context.Context, request PersonPatchRequestObje
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
 				slog.String("error", err.Error()))
+
 			return PersonPatch5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
 	return PersonPatch200Response{}, nil
 }
 
 // PersonPost implements StrictServerInterface.
-func (s *Server) PersonPost(ctx context.Context, request PersonPostRequestObject) (PersonPostResponseObject, error) {
+func (s *Server) PersonPost( //nolint:ireturn
+	ctx context.Context, request PersonPostRequestObject,
+) (PersonPostResponseObject, error) {
 	person := domain.Person{
-		Name:       request.Body.Name,
-		Surname:    request.Body.Surname,
-		Patronymic: request.Body.Patronymic,
-		// TODO: fetch from an external API
+		Name:        request.Body.Name,
+		Surname:     request.Body.Surname,
+		Patronymic:  request.Body.Patronymic,
 		Nationality: "RU",
-		Sex:         "male",
-		Age:         42,
+		Sex:         domain.Male,
+		Age:         42, //nolint:gomnd
+		ID:          [16]byte{},
 	}
-	personID, err := s.People.Create(ctx, &person)
+
+	personID, err := s.People.Create(ctx, person)
 	if err != nil {
 		switch {
 		case errors.Is(err, repo.ErrArgument):
@@ -154,23 +173,28 @@ func (s *Server) PersonPost(ctx context.Context, request PersonPostRequestObject
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
 				slog.String("error", err.Error()))
+
 			return PersonPost5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
 	response := PersonPost201JSONResponse(personID)
-	// s.Logger.Debug("end of PersonPost", slog.Any("result", response))
+
 	return response, nil
 }
 
 // PersonPut implements StrictServerInterface.
-func (s *Server) PersonPut(ctx context.Context, request PersonPutRequestObject) (PersonPutResponseObject, error) {
-	err := s.People.FullUpdate(ctx, request.PersonID, &domain.Person{
+func (s *Server) PersonPut( //nolint:ireturn
+	ctx context.Context, request PersonPutRequestObject,
+) (PersonPutResponseObject, error) {
+	err := s.People.FullUpdate(ctx, request.PersonID, domain.Person{
 		Name:        request.Body.Name,
 		Surname:     request.Body.Surname,
 		Patronymic:  request.Body.Patronymic,
 		Nationality: request.Body.Nationality,
 		Sex:         domain.Sex(request.Body.Sex),
 		Age:         request.Body.Age,
+		ID:          [16]byte{},
 	})
 	if err != nil {
 		switch {
@@ -183,14 +207,18 @@ func (s *Server) PersonPut(ctx context.Context, request PersonPutRequestObject) 
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
 				slog.String("error", err.Error()))
+
 			return PersonPut5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
 	return PersonPut200Response{}, nil
 }
 
 // PersonDelete implements StrictServerInterface.
-func (s *Server) PersonDelete(ctx context.Context, request PersonDeleteRequestObject) (PersonDeleteResponseObject, error) {
+func (s *Server) PersonDelete( //nolint:ireturn
+	ctx context.Context, request PersonDeleteRequestObject,
+) (PersonDeleteResponseObject, error) {
 	err := s.People.Delete(ctx, request.PersonID)
 	if err != nil {
 		switch {
@@ -203,8 +231,10 @@ func (s *Server) PersonDelete(ctx context.Context, request PersonDeleteRequestOb
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
 				slog.String("error", err.Error()))
+
 			return PersonDelete5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
 	return PersonDelete200Response{}, nil
 }

@@ -16,7 +16,9 @@ type People struct {
 }
 
 // ensure People implements the interface
-var _ repo.PersonRepo = &People{}
+var _ repo.PersonRepo = &People{
+	People: nil,
+}
 
 func New() *People {
 	return &People{
@@ -25,13 +27,11 @@ func New() *People {
 }
 
 // Create implements repo.Repo.
-func (p *People) Create(ctx context.Context, obj *domain.Person) (uuid.UUID, error) {
-	if obj == nil {
-		return uuid.UUID{}, repo.ErrArgument
-	}
+func (p *People) Create(ctx context.Context, obj domain.Person) (uuid.UUID, error) {
 	id := uuid.New()
 	obj.ID = id
-	p.People[id] = *obj
+	p.People[id] = obj
+
 	return id, nil
 }
 
@@ -40,88 +40,114 @@ func (p *People) Delete(ctx context.Context, id uuid.UUID) error {
 	if _, found := p.People[id]; !found {
 		return repo.ErrNotFound
 	}
+
 	delete(p.People, id)
+
 	return nil
 }
 
 // FullUpdate implements repo.Repo.
-func (p *People) FullUpdate(ctx context.Context, id uuid.UUID, replacement *domain.Person) error {
-	if _, found := p.People[id]; !found {
+func (p *People) FullUpdate(ctx context.Context, personID uuid.UUID, replacement domain.Person) error {
+	if _, found := p.People[personID]; !found {
 		return repo.ErrNotFound
 	}
-	task := *replacement
-	task.ID = id
-	p.People[id] = task
+
+	task := replacement
+	task.ID = personID
+	p.People[personID] = task
+
 	return nil
 }
 
 // GetByID implements repo.Repo.
-func (p *People) GetByID(ctx context.Context, id uuid.UUID) (*domain.Person, error) {
+func (p *People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, error) {
 	task, found := p.People[id]
 	if !found {
-		return nil, repo.ErrNotFound
+		return domain.Person{}, repo.ErrNotFound
 	}
-	return &task, nil
+
+	return task, nil
+}
+
+//nolint:cyclop
+func personMatches(filter domain.PersonFilter, person domain.Person) bool {
+	// filter condition violations
+	youngerThanMinAge := (filter.AgeMin != nil) && (*filter.AgeMin > person.Age)
+	olderThanMaxAge := (filter.AgeMax != nil) && (*filter.AgeMax < person.Age)
+	nameMismatch := (filter.Name != nil) &&
+		!strings.Contains(person.Name, *filter.Name)
+
+	surnameMismatch := (filter.Surname != nil) &&
+		!strings.Contains(person.Surname, *filter.Surname)
+
+	patronymicMismatch := (filter.Patronymic != nil) &&
+		((*filter.Patronymic == "") && (person.Patronymic != "") ||
+			(*filter.Patronymic != "") &&
+				!strings.Contains(person.Patronymic, *filter.Patronymic))
+
+	nationalityMismatch := (filter.Nationality != nil) &&
+		(*filter.Nationality != person.Nationality)
+
+	sexMismatch := (filter.Sex != nil) && (*filter.Sex != person.Sex)
+
+	return !(youngerThanMinAge || olderThanMaxAge || nameMismatch || surnameMismatch ||
+		patronymicMismatch || nationalityMismatch || sexMismatch)
 }
 
 // List implements repo.Repo.
-func (p *People) List(ctx context.Context, filter domain.PersonFilter, pagination domain.PaginationFilter) (domain.Page[*domain.Person], error) {
+func (p *People) List(
+	ctx context.Context, filter domain.PersonFilter, pagination domain.PaginationFilter,
+) (domain.Page[domain.Person], error) {
 	keys := make([]uuid.UUID, 0)
 	for key := range p.People {
 		keys = append(keys, key)
 	}
+
 	slices.SortFunc(keys, func(a, b uuid.UUID) int {
 		return strings.Compare(a.String(), b.String())
 	})
 
-	result := make([]*domain.Person, 0)
-	i := 0
+	result := make([]domain.Person, 0)
+	recordIndex := 0
+
 	for _, id := range keys {
 		person := p.People[id]
-		// filter condition violations
-		youngerThanMinAge := (filter.AgeMin != nil) && (*filter.AgeMin > person.Age)
-		olderThanMaxAge := (filter.AgeMax != nil) && (*filter.AgeMax < person.Age)
-		nameMismatch := (filter.NameFragment != nil) &&
-			!strings.Contains(person.Name, *filter.NameFragment)
 
-		surnameMismatch := (filter.SurnameFragment != nil) &&
-			!strings.Contains(person.Surname, *filter.SurnameFragment)
-
-		patronymicMismatch := (filter.PatronymicFragment != nil) &&
-			((*filter.PatronymicFragment == "") && (person.Patronymic != "") ||
-				(*filter.PatronymicFragment != "") &&
-					!strings.Contains(person.Patronymic, *filter.PatronymicFragment))
-
-		nationalityMismatch := (filter.Nationality != nil) &&
-			(*filter.Nationality != person.Nationality)
-
-		sexMismatch := (filter.Sex != nil) && (*filter.Sex != person.Sex)
-
-		if youngerThanMinAge || olderThanMaxAge || nameMismatch || surnameMismatch ||
-			patronymicMismatch || nationalityMismatch || sexMismatch {
+		if !personMatches(filter, person) {
 			continue
 		}
-		if (i >= pagination.Offset) && (i < pagination.Offset+pagination.Limit) {
-			result = append(result, &person)
+
+		if (recordIndex >= pagination.Offset) && (recordIndex < pagination.Offset+pagination.Limit) {
+			result = append(result, person)
 		}
-		i++
+		recordIndex++
 	}
-	page := domain.Page[*domain.Person]{
+
+	page := domain.Page[domain.Person]{
 		Items:         result,
 		CurrentLimit:  pagination.Limit,
 		CurrentOffset: pagination.Offset,
 		TotalItems:    len(p.People),
 	}
+
 	return page, nil
 }
 
 // PartialUpdate implements repo.Repo.
-func (p *People) PartialUpdate(ctx context.Context, id uuid.UUID, partial domain.PersonPartial) error {
-	person, found := p.People[id]
+func (p *People) PartialUpdate(ctx context.Context, personID uuid.UUID, partial domain.PersonPartial) error {
+	person, found := p.People[personID]
 	if !found {
 		return repo.ErrNotFound
 	}
-	if (partial == domain.PersonPartial{}) {
+
+	if (partial == domain.PersonPartial{
+		Name:        nil,
+		Surname:     nil,
+		Patronymic:  nil,
+		Nationality: nil,
+		Sex:         nil,
+		Age:         nil,
+	}) {
 		return repo.ErrArgument
 	}
 	// storing (*T)(nil) in `any` is dangerous (!= nil)
@@ -142,6 +168,8 @@ func (p *People) PartialUpdate(ctx context.Context, id uuid.UUID, partial domain
 			left.Set(right)
 		}
 	}
-	p.People[id] = person
+
+	p.People[personID] = person
+
 	return nil
 }

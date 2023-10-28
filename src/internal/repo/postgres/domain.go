@@ -2,41 +2,63 @@ package postgres
 
 import (
 	"github.com/Hofsiedge/person-api/internal/domain"
-	"github.com/jackc/pgx/v5/pgtype"
+	"github.com/google/uuid"
 )
 
 type Person struct {
-	PersonID    pgtype.UUID `db:"person_id"`
-	Name        pgtype.Text `db:"name"`
-	Surname     pgtype.Text `db:"surname"`
-	Patronymic  pgtype.Text `db:"patronymic"`
-	Age         pgtype.Int8 `db:"age"`
-	Sex         pgtype.Text `db:"sex"`
-	Nationality pgtype.Text `db:"nationality"`
+	PersonID    uuid.UUID `db:"person_id"`
+	Name        string    `db:"name"`
+	Surname     string    `db:"surname"`
+	Patronymic  string    `db:"patronymic"`
+	Age         int       `db:"age"`
+	Sex         string    `db:"sex"`
+	Nationality string    `db:"nationality"`
 }
 
 // convert Person to domain.Person
 func (p Person) ToAbstract() domain.Person {
 	return domain.Person{
-		Name:        p.Name.String,
-		Surname:     p.Surname.String,
-		Patronymic:  p.Patronymic.String,
-		Nationality: p.Nationality.String,
-		Sex:         domain.Sex(p.Sex.String),
-		Age:         int(p.Age.Int64),
-		ID:          p.PersonID.Bytes,
+		Name:        p.Name,
+		Surname:     p.Surname,
+		Patronymic:  p.Patronymic,
+		Nationality: p.Nationality,
+		Sex:         domain.Sex(p.Sex),
+		Age:         p.Age,
+		ID:          p.PersonID,
 	}
 }
 
 // convert domain.Person to Person
 func ToConcrete(person domain.Person) Person {
 	return Person{
-		PersonID:    pgtype.UUID{Bytes: person.ID, Valid: true},
-		Name:        pgtype.Text{String: person.Name, Valid: true},
-		Surname:     pgtype.Text{String: person.Surname, Valid: true},
-		Patronymic:  pgtype.Text{String: person.Patronymic, Valid: true},
-		Age:         pgtype.Int8{Int64: int64(person.Age), Valid: true},
-		Sex:         pgtype.Text{String: string(person.Sex), Valid: true},
-		Nationality: pgtype.Text{String: person.Nationality, Valid: true},
+		PersonID:    person.ID,
+		Name:        person.Name,
+		Surname:     person.Surname,
+		Patronymic:  person.Patronymic,
+		Age:         person.Age,
+		Sex:         string(person.Sex),
+		Nationality: person.Nationality,
 	}
+}
+
+type PersonPage struct {
+	People        []Person `db:"people"`
+	CurrentOffset int      `db:"current_offset"`
+	CurrentLimit  int      `db:"current_limit"`
+	Total         int      `db:"total"`
+}
+
+// convert PersonPage to domain.Page[domain.Person]
+func (p PersonPage) ToAbstract() domain.Page[domain.Person] {
+	page := domain.Page[domain.Person]{
+		Items:         make([]domain.Person, p.Total),
+		CurrentOffset: p.CurrentOffset,
+		CurrentLimit:  p.CurrentLimit,
+		TotalItems:    p.Total,
+	}
+	for i, person := range p.People {
+		page.Items[i] = person.ToAbstract()
+	}
+
+	return page
 }

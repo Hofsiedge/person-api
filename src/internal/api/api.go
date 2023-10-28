@@ -72,13 +72,14 @@ func (s *Server) PersonList( //nolint:ireturn
 ) (PersonListResponseObject, error) {
 	// TODO: test with nulls for paginaion
 	page, err := s.People.List(ctx, domain.PersonFilter{
-		NameFragment:       request.Params.Name,
-		SurnameFragment:    request.Params.Surname,
-		PatronymicFragment: request.Params.Patronymic,
-		Nationality:        request.Params.Nationality,
-		Sex:                (*domain.Sex)(request.Params.Sex),
-		AgeMin:             request.Params.AgeMin,
-		AgeMax:             request.Params.AgeMax,
+		Name:        request.Params.Name,
+		Surname:     request.Params.Surname,
+		Patronymic:  request.Params.Patronymic,
+		Nationality: request.Params.Nationality,
+		Sex:         (*domain.Sex)(request.Params.Sex),
+		AgeMin:      request.Params.AgeMin,
+		AgeMax:      request.Params.AgeMax,
+		Threshold:   request.Params.Threshold,
 	}, domain.PaginationFilter{
 		Offset: *request.Params.Offset,
 		Limit:  *request.Params.Limit,

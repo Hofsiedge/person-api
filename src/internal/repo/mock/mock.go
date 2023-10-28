@@ -74,16 +74,16 @@ func personMatches(filter domain.PersonFilter, person domain.Person) bool {
 	// filter condition violations
 	youngerThanMinAge := (filter.AgeMin != nil) && (*filter.AgeMin > person.Age)
 	olderThanMaxAge := (filter.AgeMax != nil) && (*filter.AgeMax < person.Age)
-	nameMismatch := (filter.NameFragment != nil) &&
-		!strings.Contains(person.Name, *filter.NameFragment)
+	nameMismatch := (filter.Name != nil) &&
+		!strings.Contains(person.Name, *filter.Name)
 
-	surnameMismatch := (filter.SurnameFragment != nil) &&
-		!strings.Contains(person.Surname, *filter.SurnameFragment)
+	surnameMismatch := (filter.Surname != nil) &&
+		!strings.Contains(person.Surname, *filter.Surname)
 
-	patronymicMismatch := (filter.PatronymicFragment != nil) &&
-		((*filter.PatronymicFragment == "") && (person.Patronymic != "") ||
-			(*filter.PatronymicFragment != "") &&
-				!strings.Contains(person.Patronymic, *filter.PatronymicFragment))
+	patronymicMismatch := (filter.Patronymic != nil) &&
+		((*filter.Patronymic == "") && (person.Patronymic != "") ||
+			(*filter.Patronymic != "") &&
+				!strings.Contains(person.Patronymic, *filter.Patronymic))
 
 	nationalityMismatch := (filter.Nationality != nil) &&
 		(*filter.Nationality != person.Nationality)

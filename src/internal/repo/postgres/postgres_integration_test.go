@@ -85,6 +85,25 @@ func TestIntegration(t *testing.T) {
 			t.Errorf("the Person was not deleted. error: %v", err)
 		}
 	}
+
+	// list
+	for i := 0; i < 10; i++ {
+		person = utils.MakePerson()
+		if _, err = people.Create(context.Background(), person); err != nil {
+			t.Fatalf("could not create a Person: %v", err)
+		}
+	}
+
+	page, err := people.List(
+		context.Background(),
+		domain.PersonFilter{}, //nolint:exhaustruct
+		domain.PaginationFilter{Offset: 0, Limit: 0},
+	)
+	if err != nil {
+		t.Errorf("could not list Person records: %v", err)
+	} else if page.CurrentLimit != 0 || page.CurrentOffset != 0 || page.TotalItems != 10 {
+		t.Errorf("page mismatch: got %v", page)
+	}
 }
 
 //nolint:gochecknoglobals

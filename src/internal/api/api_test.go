@@ -570,16 +570,16 @@ func makeListRequest(personFilter domain.PersonFilter, paginationFilter *domain.
 		values.Add("nationality", *personFilter.Nationality)
 	}
 
-	if personFilter.NameFragment != nil {
-		values.Add("name", *personFilter.NameFragment)
+	if personFilter.Name != nil {
+		values.Add("name", *personFilter.Name)
 	}
 
-	if personFilter.PatronymicFragment != nil {
-		values.Add("patronymic", *personFilter.PatronymicFragment)
+	if personFilter.Patronymic != nil {
+		values.Add("patronymic", *personFilter.Patronymic)
 	}
 
-	if personFilter.SurnameFragment != nil {
-		values.Add("surname", *personFilter.SurnameFragment)
+	if personFilter.Surname != nil {
+		values.Add("surname", *personFilter.Surname)
 	}
 	// paginationFilter values
 	if paginationFilter != nil {
@@ -615,8 +615,8 @@ func TestList(t *testing.T) {
 				minAge := 20
 				nameFragment := "a"
 				personFilter := domain.PersonFilter{ //nolint:exhaustruct
-					AgeMin:       &minAge,
-					NameFragment: &nameFragment,
+					AgeMin: &minAge,
+					Name:   &nameFragment,
 				}
 				paginationFilter := domain.PaginationFilter{Limit: 2, Offset: 1}
 

@@ -16,7 +16,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// pgxpool.Pool / github.com/jackc/pgx/v5
+// pgxpool.Pool / pgxmock.PgxPoolIface
 type PgxPoolInterface interface {
 	Exec(ctx context.Context, sql string, arguments ...any) (pgconn.CommandTag, error)
 	QueryRow(ctx context.Context, sql string, args ...any) pgx.Row
@@ -37,6 +37,26 @@ func New(cfg config.DBConfig) (*People, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", repo.ErrArgument, err)
+	}
+
+	// register custom types
+	poolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
+		customTypes := []string{
+			"people.sex",
+			"people.people",
+			"people.people[]",
+			"people.people_page",
+		}
+		for _, typeName := range customTypes {
+			dataType, loadErr := conn.LoadType(ctx, typeName)
+			if loadErr != nil {
+				return err //nolint:wrapcheck
+			}
+
+			conn.TypeMap().RegisterType(dataType)
+		}
+
+		return nil
 	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
@@ -133,10 +153,26 @@ func (p *People) GetByID(ctx context.Context, id uuid.UUID) (domain.Person, erro
 }
 
 // List implements repo.PersonRepo.
-func (*People) List(
+func (p *People) List(
 	ctx context.Context, filter domain.PersonFilter, pagination domain.PaginationFilter,
 ) (domain.Page[domain.Person], error) {
-	panic("unimplemented")
+	row := p.db.QueryRow(ctx, `select people.list_people(
+			name_ => $1, surname_ => $2, patronymic_ => $3, age_min => $4,
+			age_max => $5, sex_ => $6, nationality_ => $7, threshold => $8,
+			offset_ => $9, limit_ => $10)`,
+		filter.Name, filter.Surname, filter.Patronymic, filter.AgeMin,
+		filter.AgeMax, filter.Sex, filter.Nationality, filter.Threshold,
+		pagination.Offset, pagination.Limit,
+	)
+
+	var page PersonPage
+
+	err := row.Scan(&page)
+	if err != nil {
+		return domain.Page[domain.Person]{}, wrapPostgresError(err)
+	}
+
+	return page.ToAbstract(), nil
 }
 
 // PartialUpdate implements repo.PersonRepo.

@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"regexp"
+
 	"github.com/google/uuid"
 )
 
@@ -11,11 +13,23 @@ const (
 	Female Sex = "female"
 )
 
+func (s Sex) Valid() bool {
+	return (s == Male) || (s == Female)
+}
+
+type Nationality string
+
+var NationalityPattern = regexp.MustCompile("^[A-Z]{2}$")
+
+func (n Nationality) Valid() bool {
+	return NationalityPattern.Match([]byte(n))
+}
+
 type Person struct {
 	Name        string
 	Surname     string
 	Patronymic  string
-	Nationality string
+	Nationality Nationality
 	Sex         Sex
 	Age         int
 	ID          uuid.UUID
@@ -38,7 +52,7 @@ type PersonFilter struct {
 	Name        *string
 	Surname     *string
 	Patronymic  *string
-	Nationality *string // TODO: separate type
+	Nationality *Nationality
 	Sex         *Sex
 	AgeMin      *int
 	AgeMax      *int

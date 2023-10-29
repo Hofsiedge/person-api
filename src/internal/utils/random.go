@@ -38,7 +38,7 @@ func MakePerson() domain.Person {
 		Name:        capitalizer.String(GenerateRandomString(2, 10)),
 		Surname:     capitalizer.String(GenerateRandomString(2, 20)),
 		Patronymic:  capitalizer.String(GenerateRandomString(0, 10)),
-		Nationality: strings.ToTitle(GenerateRandomString(2, 2)),
+		Nationality: domain.Nationality(strings.ToTitle(GenerateRandomString(2, 2))),
 		Sex:         sex,
 		Age:         rand.Int() % 120,
 		ID:          uuid.New(),

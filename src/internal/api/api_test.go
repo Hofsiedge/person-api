@@ -17,8 +17,10 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/Hofsiedge/person-api/internal/api"
+	"github.com/Hofsiedge/person-api/internal/completer"
 	"github.com/Hofsiedge/person-api/internal/domain"
 	"github.com/Hofsiedge/person-api/internal/repo"
 	"github.com/Hofsiedge/person-api/internal/repo/mock"
@@ -26,6 +28,20 @@ import (
 	"github.com/google/uuid"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
 )
+
+type MockCompleter struct{}
+
+func (mc MockCompleter) Complete(name string) (completer.CompletionData, error) {
+	return completer.CompletionData{
+		Sex:         domain.Female,
+		Nationality: domain.Nationality("RU"),
+		Age:         50,
+	}, nil
+}
+
+func (mc MockCompleter) UnlockingTime() (time.Time, error) {
+	return time.Now(), nil
+}
 
 type testCase struct {
 	init   func(t *testing.T, people repo.PersonRepo) (req *http.Request, check func(response *http.Response))
@@ -132,7 +148,7 @@ func serve(t *testing.T, request *http.Request, people repo.PersonRepo) *http.Re
 		ReplaceAttr: nil,
 	}))
 
-	server, err := api.New(people, logger)
+	server, err := api.New(people, MockCompleter{}, logger)
 	if err != nil {
 		t.Fatalf("error creating a server: %v", err)
 	}
@@ -203,7 +219,7 @@ func TestGet(t *testing.T) {
 					Age:         person.Age,
 					Id:          person.ID,
 					Name:        person.Name,
-					Nationality: person.Nationality,
+					Nationality: string(person.Nationality),
 					Patronymic:  person.Patronymic,
 					Sex:         api.Sex(person.Sex),
 					Surname:     person.Surname,
@@ -302,7 +318,7 @@ func TestPut(t *testing.T) {
 		body := api.PersonPutJSONRequestBody{
 			Age:         person.Age,
 			Name:        person.Name,
-			Nationality: person.Nationality,
+			Nationality: string(person.Nationality),
 			Patronymic:  person.Patronymic,
 			Sex:         api.Sex(person.Sex),
 			Surname:     person.Surname,
@@ -348,7 +364,7 @@ func TestPut(t *testing.T) {
 				request := makePutRequest(personID, &api.PersonPutJSONRequestBody{
 					Age:         newPerson.Age,
 					Name:        newPerson.Name,
-					Nationality: newPerson.Nationality,
+					Nationality: string(newPerson.Nationality),
 					Patronymic:  newPerson.Patronymic,
 					Sex:         api.Sex(newPerson.Sex),
 					Surname:     newPerson.Surname,
@@ -567,7 +583,7 @@ func makeListRequest(personFilter domain.PersonFilter, paginationFilter *domain.
 	}
 
 	if personFilter.Nationality != nil {
-		values.Add("nationality", *personFilter.Nationality)
+		values.Add("nationality", string(*personFilter.Nationality))
 	}
 
 	if personFilter.Name != nil {
@@ -643,7 +659,7 @@ func TestList(t *testing.T) {
 							Age:         person.Age,
 							Id:          person.ID,
 							Name:        person.Name,
-							Nationality: person.Nationality,
+							Nationality: string(person.Nationality),
 							Patronymic:  person.Patronymic,
 							Sex:         api.Sex(person.Sex),
 							Surname:     person.Surname,

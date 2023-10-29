@@ -131,7 +131,7 @@ func (p *People) FullUpdate(ctx context.Context, id uuid.UUID, replacement domai
 		Name:        &replacement.Name,
 		Surname:     &replacement.Surname,
 		Patronymic:  &replacement.Patronymic,
-		Nationality: &replacement.Nationality,
+		Nationality: (*string)(&replacement.Nationality),
 		Sex:         &replacement.Sex,
 		Age:         &replacement.Age,
 	})

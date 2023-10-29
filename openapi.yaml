@@ -248,6 +248,16 @@ paths:
           description: Person was created successfully
         '400':
           description: Invalid Person format
+        '422':
+          description: Person name seems to be invalid
+        '503':
+          description: Temporarily unavalable
+          headers:
+            Retry-After:
+              schema:
+                description: Number of seconds until the method becomes available
+                minimum: 0
+                type: integer
         '5XX':
           $ref: '#/components/responses/5XXInternalServerError'
       summary: Create a Person

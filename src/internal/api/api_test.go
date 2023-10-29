@@ -203,7 +203,7 @@ func TestGet(t *testing.T) {
 					Age:         person.Age,
 					Id:          person.ID,
 					Name:        person.Name,
-					Nationality: person.Nationality,
+					Nationality: string(person.Nationality),
 					Patronymic:  person.Patronymic,
 					Sex:         api.Sex(person.Sex),
 					Surname:     person.Surname,
@@ -302,7 +302,7 @@ func TestPut(t *testing.T) {
 		body := api.PersonPutJSONRequestBody{
 			Age:         person.Age,
 			Name:        person.Name,
-			Nationality: person.Nationality,
+			Nationality: string(person.Nationality),
 			Patronymic:  person.Patronymic,
 			Sex:         api.Sex(person.Sex),
 			Surname:     person.Surname,
@@ -348,7 +348,7 @@ func TestPut(t *testing.T) {
 				request := makePutRequest(personID, &api.PersonPutJSONRequestBody{
 					Age:         newPerson.Age,
 					Name:        newPerson.Name,
-					Nationality: newPerson.Nationality,
+					Nationality: string(newPerson.Nationality),
 					Patronymic:  newPerson.Patronymic,
 					Sex:         api.Sex(newPerson.Sex),
 					Surname:     newPerson.Surname,
@@ -567,7 +567,7 @@ func makeListRequest(personFilter domain.PersonFilter, paginationFilter *domain.
 	}
 
 	if personFilter.Nationality != nil {
-		values.Add("nationality", *personFilter.Nationality)
+		values.Add("nationality", string(*personFilter.Nationality))
 	}
 
 	if personFilter.Name != nil {
@@ -643,7 +643,7 @@ func TestList(t *testing.T) {
 							Age:         person.Age,
 							Id:          person.ID,
 							Name:        person.Name,
-							Nationality: person.Nationality,
+							Nationality: string(person.Nationality),
 							Patronymic:  person.Patronymic,
 							Sex:         api.Sex(person.Sex),
 							Surname:     person.Surname,

@@ -272,7 +272,7 @@ func TestPartialUpdate(t *testing.T) {
 		Name:        &person.Name,
 		Surname:     &person.Surname,
 		Patronymic:  &person.Patronymic,
-		Nationality: &person.Nationality,
+		Nationality: (*string)(&person.Nationality),
 		Sex:         &person.Sex,
 		Age:         &person.Age,
 	}

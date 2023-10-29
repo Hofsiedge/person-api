@@ -59,7 +59,7 @@ func (s *Server) PersonGet( //nolint:ireturn
 		Age:         person.Age,
 		Id:          person.ID,
 		Name:        person.Name,
-		Nationality: person.Nationality,
+		Nationality: string(person.Nationality),
 		Patronymic:  person.Patronymic,
 		Sex:         Sex(person.Sex),
 		Surname:     person.Surname,
@@ -71,11 +71,12 @@ func (s *Server) PersonList( //nolint:ireturn
 	ctx context.Context, request PersonListRequestObject,
 ) (PersonListResponseObject, error) {
 	// TODO: test with nulls for paginaion
+	// TODO: test with incorrect Nationality and Sex parameters
 	page, err := s.People.List(ctx, domain.PersonFilter{
 		Name:        request.Params.Name,
 		Surname:     request.Params.Surname,
 		Patronymic:  request.Params.Patronymic,
-		Nationality: request.Params.Nationality,
+		Nationality: (*domain.Nationality)(request.Params.Nationality),
 		Sex:         (*domain.Sex)(request.Params.Sex),
 		AgeMin:      request.Params.AgeMin,
 		AgeMax:      request.Params.AgeMax,
@@ -101,7 +102,7 @@ func (s *Server) PersonList( //nolint:ireturn
 			Age:         person.Age,
 			Id:          person.ID,
 			Name:        person.Name,
-			Nationality: person.Nationality,
+			Nationality: string(person.Nationality),
 			Patronymic:  person.Patronymic,
 			Sex:         Sex(person.Sex),
 			Surname:     person.Surname,
@@ -191,7 +192,7 @@ func (s *Server) PersonPut( //nolint:ireturn
 		Name:        request.Body.Name,
 		Surname:     request.Body.Surname,
 		Patronymic:  request.Body.Patronymic,
-		Nationality: request.Body.Nationality,
+		Nationality: domain.Nationality(request.Body.Nationality),
 		Sex:         domain.Sex(request.Body.Sex),
 		Age:         request.Body.Age,
 		ID:          [16]byte{},

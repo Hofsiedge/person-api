@@ -21,7 +21,7 @@ func (p Person) ToAbstract() domain.Person {
 		Name:        p.Name,
 		Surname:     p.Surname,
 		Patronymic:  p.Patronymic,
-		Nationality: p.Nationality,
+		Nationality: domain.Nationality(p.Nationality),
 		Sex:         domain.Sex(p.Sex),
 		Age:         p.Age,
 		ID:          p.PersonID,
@@ -37,7 +37,7 @@ func ToConcrete(person domain.Person) Person {
 		Patronymic:  person.Patronymic,
 		Age:         person.Age,
 		Sex:         string(person.Sex),
-		Nationality: person.Nationality,
+		Nationality: string(person.Nationality),
 	}
 }
 

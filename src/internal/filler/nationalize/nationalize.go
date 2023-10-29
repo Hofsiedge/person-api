@@ -10,7 +10,9 @@ import (
 
 // nationalizer
 
-type Nationalizer filler.Filler[domain.Nationality, NationalizerValidResponse]
+type Nationalizer struct {
+	filler.Filler[domain.Nationality, NationalizerValidResponse]
+}
 
 type CountryData struct {
 	CountryID string `json:"country_id"` //nolint:tagliatelle
@@ -34,5 +36,7 @@ func (nvr NationalizerValidResponse) Convert() (domain.Nationality, error) {
 }
 
 func New(baseURL string, token *string, client *http.Client) Nationalizer {
-	return Nationalizer(filler.New[domain.Nationality, NationalizerValidResponse](baseURL, token, client))
+	return Nationalizer{
+		filler.New[domain.Nationality, NationalizerValidResponse](baseURL, token, client),
+	}
 }

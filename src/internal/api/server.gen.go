@@ -457,6 +457,28 @@ func (response PersonPost400Response) VisitPersonPostResponse(w http.ResponseWri
 	return nil
 }
 
+type PersonPost422Response struct {
+}
+
+func (response PersonPost422Response) VisitPersonPostResponse(w http.ResponseWriter) error {
+	w.WriteHeader(422)
+	return nil
+}
+
+type PersonPost503ResponseHeaders struct {
+	RetryAfter int
+}
+
+type PersonPost503Response struct {
+	Headers PersonPost503ResponseHeaders
+}
+
+func (response PersonPost503Response) VisitPersonPostResponse(w http.ResponseWriter) error {
+	w.Header().Set("Retry-After", fmt.Sprint(response.Headers.RetryAfter))
+	w.WriteHeader(503)
+	return nil
+}
+
 type PersonPost5XXResponse struct {
 	StatusCode int
 }

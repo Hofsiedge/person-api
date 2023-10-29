@@ -8,7 +8,9 @@ import (
 
 // agifier
 
-type Agifier filler.Filler[int, AgifierValidResponse]
+type Agifier struct {
+	filler.Filler[int, AgifierValidResponse]
+}
 
 type AgifierValidResponse struct {
 	Age *int `json:"age"`
@@ -23,5 +25,7 @@ func (avr AgifierValidResponse) Convert() (int, error) {
 }
 
 func New(baseURL string, token *string, client *http.Client) Agifier {
-	return Agifier(filler.New[int, AgifierValidResponse](baseURL, token, client))
+	return Agifier{
+		filler.New[int, AgifierValidResponse](baseURL, token, client),
+	}
 }

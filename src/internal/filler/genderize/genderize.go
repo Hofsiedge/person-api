@@ -10,7 +10,9 @@ import (
 
 // genderizer
 
-type Genderizer filler.Filler[domain.Sex, GenderizerValidResponse]
+type Genderizer struct {
+	filler.Filler[domain.Sex, GenderizerValidResponse]
+}
 
 type GenderizerValidResponse struct {
 	Gender *domain.Sex `json:"gender"`
@@ -29,5 +31,7 @@ func (gvr GenderizerValidResponse) Convert() (domain.Sex, error) {
 }
 
 func New(baseURL string, token *string, client *http.Client) Genderizer {
-	return Genderizer(filler.New[domain.Sex, GenderizerValidResponse](baseURL, token, client))
+	return Genderizer{
+		filler.New[domain.Sex, GenderizerValidResponse](baseURL, token, client),
+	}
 }

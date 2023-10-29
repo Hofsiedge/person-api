@@ -10,6 +10,13 @@ type DBConfig struct {
 	ConnString string `env:"DB_CONN" env-description:"Postgres connection string" env-required:"true"`
 }
 
+type CompleterConfig struct {
+	CompleterToken *string `env:"COMPLETER_TOKEN" env-description:"API token for filler services"`
+	AgifyURL       string  `env:"AGIFY_URL"       env-required:"true"`
+	GenderizeURL   string  `env:"GENDERIZE_URL"   env-required:"true"`
+	NationalizeURL string  `env:"NATIONALIZE_URL" env-required:"true"`
+}
+
 // read config from environment variables
 //
 // returns invalid config on error

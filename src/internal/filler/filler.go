@@ -15,24 +15,30 @@ import (
 const GetRequestTimeout = time.Second * 3
 
 var (
+	// base error
 	ErrFiller = errors.New("filler error")
 
-	ErrNotReady     = fmt.Errorf("%w: filler is not ready (not used yet)", ErrFiller)
-	ErrInvalidURL   = fmt.Errorf("%w: invalid URL", ErrFiller)
-	ErrTimeout      = fmt.Errorf("%w: timeout", ErrFiller)
-	ErrNetworkError = fmt.Errorf("%w: network error", ErrFiller)
+	ErrEnvironment     = fmt.Errorf("%w: environment error", ErrFiller)
+	ErrInvalidURL      = fmt.Errorf("%w: invalid URL", ErrEnvironment)
+	ErrInvalidAPIToken = fmt.Errorf("%w: invalid API token", ErrEnvironment)
 
-	ErrInvalidResponse = fmt.Errorf("%w: invalid response", ErrFiller)
+	ErrNetworkError = fmt.Errorf("%w: network error", ErrFiller)
+	ErrTimeout      = fmt.Errorf("%w: timeout", ErrNetworkError)
+
+	ErrAPI             = fmt.Errorf("%w: api error", ErrFiller)
+	ErrInvalidResponse = fmt.Errorf("%w: invalid response", ErrAPI)
 	ErrInvalidHeader   = fmt.Errorf("%w: invalid header", ErrInvalidResponse)
 	ErrInvalidStatus   = fmt.Errorf("%w: invalid status code", ErrInvalidResponse)
+	ErrConversion      = fmt.Errorf("%w: conversion error", ErrInvalidResponse)
 
-	ErrInvalidAPIToken = fmt.Errorf("%w: invalid API token", ErrFiller)
-	ErrInvalidName     = fmt.Errorf("%w: invalid name", ErrFiller)
-	ErrLimitReached    = fmt.Errorf("%w: request limit reached", ErrFiller)
+	ErrUser        = fmt.Errorf("%w: user error", ErrFiller)
+	ErrInvalidName = fmt.Errorf("%w: invalid name", ErrUser)
+	ErrNotFound    = fmt.Errorf("%w: not found", ErrUser)
 
-	ErrConversion = fmt.Errorf("%w: conversion error", ErrFiller)
+	// behavior signals
 
-	ErrNotFound = fmt.Errorf("%w: not found", ErrFiller)
+	ErrNotReady     = fmt.Errorf("%w: filler is not ready (not used yet)", ErrFiller)
+	ErrLimitReached = fmt.Errorf("%w: request limit reached", ErrFiller)
 )
 
 type Converter[T any] interface {

@@ -5,8 +5,11 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"time"
 
+	"github.com/Hofsiedge/person-api/internal/completer"
 	"github.com/Hofsiedge/person-api/internal/domain"
+	"github.com/Hofsiedge/person-api/internal/filler"
 	"github.com/Hofsiedge/person-api/internal/repo"
 )
 
@@ -16,24 +19,31 @@ import (
 
 // ensure that Server implements StrictServerInterface
 var _ StrictServerInterface = &Server{
-	People: nil,
-	Logger: nil,
+	People:    nil,
+	Completer: nil,
+	Logger:    nil,
 }
 
 var ErrInit = errors.New("unexpected nil in argument list")
 
 // implements StrictServerInterface.
 type Server struct {
-	People repo.PersonRepo
-	Logger *slog.Logger
+	People    repo.PersonRepo
+	Completer Completer
+	Logger    *slog.Logger
 }
 
-func New(repo repo.PersonRepo, logger *slog.Logger) (*Server, error) {
+type Completer interface {
+	Complete(name string) (completer.CompletionData, error)
+	UnlockingTime() (time.Time, error)
+}
+
+func New(repo repo.PersonRepo, completer Completer, logger *slog.Logger) (*Server, error) {
 	if repo == nil || logger == nil {
 		return nil, ErrInit
 	}
 
-	return &Server{repo, logger}, nil
+	return &Server{repo, completer, logger}, nil
 }
 
 // PersonGet implements StrictServerInterface.
@@ -151,16 +161,42 @@ func (s *Server) PersonPatch( //nolint:ireturn
 }
 
 // PersonPost implements StrictServerInterface.
-func (s *Server) PersonPost( //nolint:ireturn
+func (s *Server) PersonPost( //nolint:ireturn,cyclop
 	ctx context.Context, request PersonPostRequestObject,
 ) (PersonPostResponseObject, error) {
+	compData, err := s.Completer.Complete(request.Body.Name)
+	if err != nil {
+		switch {
+		case errors.Is(err, filler.ErrUser):
+			return PersonPost422Response{}, nil
+
+		case errors.Is(err, filler.ErrEnvironment), errors.Is(err, filler.ErrAPI):
+			return PersonPost5XXResponse{http.StatusInternalServerError}, nil
+
+		case errors.Is(err, filler.ErrLimitReached):
+			unlockingTime, err := s.Completer.UnlockingTime()
+			if err != nil {
+				return PersonPost5XXResponse{http.StatusInternalServerError}, nil //nolint:nilerr
+			}
+
+			return PersonPost503Response{
+				Headers: PersonPost503ResponseHeaders{
+					RetryAfter: int(time.Until(unlockingTime).Seconds()),
+				},
+			}, nil
+
+		default:
+			return PersonPost5XXResponse{http.StatusInternalServerError}, nil
+		}
+	}
+
 	person := domain.Person{
 		Name:        request.Body.Name,
 		Surname:     request.Body.Surname,
 		Patronymic:  request.Body.Patronymic,
-		Nationality: "RU",
-		Sex:         domain.Male,
-		Age:         42, //nolint:gomnd
+		Nationality: compData.Nationality,
+		Sex:         compData.Sex,
+		Age:         compData.Age,
 		ID:          [16]byte{},
 	}
 

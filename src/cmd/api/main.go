@@ -12,6 +12,7 @@ import (
 	"github.com/Hofsiedge/person-api/internal/completer"
 	"github.com/Hofsiedge/person-api/internal/config"
 	"github.com/Hofsiedge/person-api/internal/repo/postgres"
+	"github.com/Hofsiedge/person-api/internal/utils"
 	"github.com/getkin/kin-openapi/openapi3"
 	"github.com/gorilla/mux"
 	middleware "github.com/oapi-codegen/nethttp-middleware"
@@ -23,6 +24,7 @@ type loggingTransport struct {
 
 func (s *loggingTransport) RoundTrip(r *http.Request) (*http.Response, error) {
 	var bytes, respBytes []byte
+
 	bytes, _ = httputil.DumpRequestOut(r, false)
 
 	resp, err := http.DefaultTransport.RoundTrip(r)
@@ -70,7 +72,7 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
-		AddSource:   serverCfg.Debug,
+		AddSource:   false,
 		Level:       level,
 		ReplaceAttr: nil,
 	}))
@@ -103,9 +105,14 @@ func main() {
 
 	//nolint:exhaustruct
 	spec.Servers = openapi3.Servers{&openapi3.Server{URL: "/api/v0"}}
-	oapiValidator := middleware.OapiRequestValidator(spec)
+	//nolint:exhaustruct
+	oapiValidator := middleware.OapiRequestValidatorWithOptions(spec, &middleware.Options{
+		SilenceServersWarning: true,
+	})
 
 	baseRouter := mux.NewRouter()
+	baseRouter.Use(utils.HTTPLoggerMiddleware(logger))
+
 	apiRouter := baseRouter.PathPrefix("/api/v0/").Subrouter()
 	apiRouter.Use(oapiValidator)
 

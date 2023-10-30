@@ -83,6 +83,11 @@ type PersonPostData struct {
 	Surname    string `json:"surname"`
 }
 
+// PostCreatedResponse defines model for PostCreatedResponse.
+type PostCreatedResponse struct {
+	Uuid UUID `json:"uuid"`
+}
+
 // Sex defines model for Sex.
 type Sex string
 

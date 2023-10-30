@@ -117,7 +117,7 @@ func TestMain(m *testing.M) {
 	flag.Parse()
 
 	if runIntegrationTests {
-		cfg, err := config.Read[config.DBConfig]()
+		cfg, err := config.Read[config.PostgresConfig]()
 		if err != nil {
 			log.Fatal(err)
 		}

@@ -121,6 +121,14 @@ components:
           - surname
           type: object
 
+    PostCreatedResponse:
+      properties:
+        uuid:
+          $ref: '#/components/schemas/UUID'
+      required:
+        - uuid
+      type: object
+
     Sex:
       enum:
         - male
@@ -200,7 +208,7 @@ paths:
           in: query
           name: threshold
           schema:
-            default: 0.5
+            default: 0.0
             maximum: 1.0
             minimum: 0.0
             type: number
@@ -244,7 +252,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/UUID'
+                $ref: '#/components/schemas/PostCreatedResponse'
           description: Person was created successfully
         '400':
           description: Invalid Person format

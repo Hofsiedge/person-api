@@ -102,6 +102,8 @@ func (s *Server) PersonList( //nolint:ireturn
 		case errors.Is(err, repo.ErrUnexpected):
 			fallthrough
 		default:
+			s.Logger.Error("error searching people", slog.String("message", err.Error()))
+
 			return PersonList5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
@@ -161,11 +163,17 @@ func (s *Server) PersonPatch( //nolint:ireturn
 }
 
 // PersonPost implements StrictServerInterface.
-func (s *Server) PersonPost( //nolint:ireturn,cyclop
+func (s *Server) PersonPost( //nolint:ireturn,cyclop,funlen
 	ctx context.Context, request PersonPostRequestObject,
 ) (PersonPostResponseObject, error) {
+	s.Logger.Info("handling POST request")
+
+	s.Logger.Debug("calling Complete", slog.String("name", request.Body.Name))
+
 	compData, err := s.Completer.Complete(request.Body.Name)
 	if err != nil {
+		s.Logger.Info("completer error", slog.String("error", err.Error()))
+
 		switch {
 		case errors.Is(err, filler.ErrUser):
 			return PersonPost422Response{}, nil
@@ -189,6 +197,13 @@ func (s *Server) PersonPost( //nolint:ireturn,cyclop
 			return PersonPost5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Debug("completer result",
+		slog.String("name", request.Body.Name),
+		slog.Int("age", compData.Age),
+		slog.String("sex", string(compData.Sex)),
+		slog.String("nationality", string(compData.Nationality)),
+	)
 
 	person := domain.Person{
 		Name:        request.Body.Name,
@@ -215,7 +230,9 @@ func (s *Server) PersonPost( //nolint:ireturn,cyclop
 		}
 	}
 
-	response := PersonPost201JSONResponse(personID)
+	response := PersonPost201JSONResponse{
+		Uuid: personID,
+	}
 
 	return response, nil
 }

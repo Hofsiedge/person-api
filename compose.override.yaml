@@ -1,8 +1,19 @@
 # override for development
 
 services:
+  api:
+    build:
+      dockerfile: ./docker/api/Dockerfile
+    environment:
+      DEBUG:     true
+      LOG_LEVEL: DEBUG
+    ports:
+      - 8080:80
+
   db:
     command: ["postgres", "-c", "log_statement=all"]
+    healthcheck:
+      interval: 1s
     image: postgres:16-alpine
     ports:
       - 5432:5432

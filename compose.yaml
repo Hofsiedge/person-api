@@ -1,9 +1,33 @@
 # basic compose structure
 
 networks:
+  api:
   db:
     
 services:
+  api:
+    container_name: api
+    depends_on:
+      db-migrate:
+        condition: service_completed_successfully
+    environment: 
+      AGIFY_URL:       "${AGIFY_URL:?}"
+      COMPLETER_TOKEN: "${COMPLETER_TOKEN}"
+      DB_CONN:         "postgres://${DB_USERNAME:?}:${DB_PASSWORD:?}@db:5432/${DB_NAME:?}"
+      DEBUG:           "${DEBUG}"
+      GENDERIZE_URL:   "${GENDERIZE_URL:?}"
+      LOG_LEVEL:       "${LOG_LEVEL:?}"
+      NATIONALIZE_URL: "${NATIONALIZE_URL:?}"
+      TIMEOUT_READ:    "${TIMEOUT_READ:?}"
+      TIMEOUT_WRITE:   "${TIMEOUT_WRITE:?}"
+    networks:
+      - api
+      - db
+    profiles:
+      - prod
+      - dev
+    restart: unless-stopped
+      
   db:
     container_name: person-db
     environment:

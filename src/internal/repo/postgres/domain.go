@@ -51,7 +51,7 @@ type PersonPage struct {
 // convert PersonPage to domain.Page[domain.Person]
 func (p PersonPage) ToAbstract() domain.Page[domain.Person] {
 	page := domain.Page[domain.Person]{
-		Items:         make([]domain.Person, p.Total),
+		Items:         make([]domain.Person, len(p.People)),
 		CurrentOffset: p.CurrentOffset,
 		CurrentLimit:  p.CurrentLimit,
 		TotalItems:    p.Total,

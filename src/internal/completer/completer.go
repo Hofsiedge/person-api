@@ -14,7 +14,7 @@ import (
 	"github.com/Hofsiedge/person-api/internal/filler/nationalize"
 )
 
-const Timeout = time.Second * 3
+const Timeout = time.Second * 10
 
 var (
 	ErrCompleterError = errors.New("completer error")
@@ -50,12 +50,17 @@ func New(cfg config.CompleterConfig, client *http.Client) *Completer {
 		}
 	}
 
+	var token *string
+	if len(cfg.CompleterToken) > 0 {
+		token = &cfg.CompleterToken
+	}
+
 	return &Completer{
 		client:       client,
 		unlockTime:   nil,
-		genderizer:   genderize.New(cfg.GenderizeURL, cfg.CompleterToken, client),
-		nationalizer: nationalize.New(cfg.GenderizeURL, cfg.CompleterToken, client),
-		agifier:      agify.New(cfg.GenderizeURL, cfg.CompleterToken, client),
+		genderizer:   genderize.New(cfg.GenderizeURL, token, client),
+		nationalizer: nationalize.New(cfg.NationalizeURL, token, client),
+		agifier:      agify.New(cfg.AgifyURL, token, client),
 	}
 }
 

@@ -1,6 +1,10 @@
 # override for DB testing
 
 services:
+  api:
+    image: scratch  # api is not required for DB testing
+    restart: never
+
   db:
     build:
       args:

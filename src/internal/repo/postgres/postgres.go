@@ -33,7 +33,7 @@ func PeopleFromPgxPoolInterface(db PgxPoolInterface) *People {
 	return &People{db}
 }
 
-func New(cfg config.DBConfig) (*People, error) {
+func New(cfg config.PostgresConfig) (*People, error) {
 	poolConfig, err := pgxpool.ParseConfig(cfg.ConnString)
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", repo.ErrArgument, err)
@@ -43,6 +43,7 @@ func New(cfg config.DBConfig) (*People, error) {
 	poolConfig.AfterConnect = func(ctx context.Context, conn *pgx.Conn) error {
 		customTypes := []string{
 			"people.sex",
+			"people.sex[]",
 			"people.people",
 			"people.people[]",
 			"people.people_page",

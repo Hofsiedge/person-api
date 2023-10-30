@@ -431,7 +431,7 @@ func TestPost(t *testing.T) {
 				return request, func(response *http.Response) {
 					personID := unmarshalJSONBody[api.PersonPost201JSONResponse](t, response)
 
-					personAfter, err := people.GetByID(context.Background(), uuid.UUID(personID))
+					personAfter, err := people.GetByID(context.Background(), personID.Uuid)
 					if err != nil {
 						t.Fatalf("Person was not saved after response")
 					}

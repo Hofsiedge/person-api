@@ -440,7 +440,7 @@ type PersonPostResponseObject interface {
 	VisitPersonPostResponse(w http.ResponseWriter) error
 }
 
-type PersonPost201JSONResponse UUID
+type PersonPost201JSONResponse PostCreatedResponse
 
 func (response PersonPost201JSONResponse) VisitPersonPostResponse(w http.ResponseWriter) error {
 	w.Header().Set("Content-Type", "application/json")

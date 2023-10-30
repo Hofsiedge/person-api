@@ -58,12 +58,15 @@ func (s *Server) PersonGet( //nolint:ireturn
 		case errors.Is(err, repo.ErrUnexpected):
 			fallthrough
 		default:
-			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
-				slog.String("error", err.Error()))
+			s.Logger.Log(ctx, slog.LevelError, "unexpected error getting a person",
+				slog.String("message", err.Error()))
 
 			return PersonGet5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "found a person by id",
+		slog.String("uuid", request.PersonID.String()))
 
 	return PersonGet200JSONResponse{
 		Age:         person.Age,
@@ -80,8 +83,6 @@ func (s *Server) PersonGet( //nolint:ireturn
 func (s *Server) PersonList( //nolint:ireturn
 	ctx context.Context, request PersonListRequestObject,
 ) (PersonListResponseObject, error) {
-	// TODO: test with nulls for paginaion
-	// TODO: test with incorrect Nationality and Sex parameters
 	page, err := s.People.List(ctx, domain.PersonFilter{
 		Name:        request.Params.Name,
 		Surname:     request.Params.Surname,
@@ -96,13 +97,17 @@ func (s *Server) PersonList( //nolint:ireturn
 		Limit:  *request.Params.Limit,
 	})
 	if err != nil {
+		s.Logger.Log(ctx, slog.LevelDebug, "error searching people",
+			slog.String("message", err.Error()))
+
 		switch {
 		case errors.Is(err, repo.ErrArgument):
 			return PersonList400Response{}, nil
 		case errors.Is(err, repo.ErrUnexpected):
 			fallthrough
 		default:
-			s.Logger.Error("error searching people", slog.String("message", err.Error()))
+			s.Logger.Log(ctx, slog.LevelError, "unexpected error searching people",
+				slog.String("message", err.Error()))
 
 			return PersonList5XXResponse{http.StatusInternalServerError}, nil
 		}
@@ -120,6 +125,13 @@ func (s *Server) PersonList( //nolint:ireturn
 			Surname:     person.Surname,
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "searched people",
+		slog.Int("offset", page.CurrentLimit),
+		slog.Int("limit", page.CurrentLimit),
+		slog.Int("total", page.TotalItems),
+		slog.Int("length", len(page.Items)),
+	)
 
 	return PersonList200JSONResponse{
 		Pagination: PaginationOffsetLimit{
@@ -144,6 +156,9 @@ func (s *Server) PersonPatch( //nolint:ireturn
 		Age:         request.Body.Age,
 	})
 	if err != nil {
+		s.Logger.Log(ctx, slog.LevelDebug, "error patching a person",
+			slog.String("message", err.Error()))
+
 		switch {
 		case errors.Is(err, repo.ErrArgument):
 			return PersonPatch400Response{}, nil
@@ -152,12 +167,15 @@ func (s *Server) PersonPatch( //nolint:ireturn
 		case errors.Is(err, repo.ErrUnexpected):
 			fallthrough
 		default:
-			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
-				slog.String("error", err.Error()))
+			s.Logger.Log(ctx, slog.LevelError, "unexpected error patching a person",
+				slog.String("message", err.Error()))
 
 			return PersonPatch5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "patched a person",
+		slog.String("uuid", request.PersonID.String()))
 
 	return PersonPatch200Response{}, nil
 }
@@ -166,13 +184,10 @@ func (s *Server) PersonPatch( //nolint:ireturn
 func (s *Server) PersonPost( //nolint:ireturn,cyclop,funlen
 	ctx context.Context, request PersonPostRequestObject,
 ) (PersonPostResponseObject, error) {
-	s.Logger.Info("handling POST request")
-
-	s.Logger.Debug("calling Complete", slog.String("name", request.Body.Name))
-
 	compData, err := s.Completer.Complete(request.Body.Name)
 	if err != nil {
-		s.Logger.Info("completer error", slog.String("error", err.Error()))
+		s.Logger.Log(ctx, slog.LevelInfo, "completer error",
+			slog.String("message", err.Error()))
 
 		switch {
 		case errors.Is(err, filler.ErrUser):
@@ -198,7 +213,7 @@ func (s *Server) PersonPost( //nolint:ireturn,cyclop,funlen
 		}
 	}
 
-	s.Logger.Debug("completer result",
+	s.Logger.Log(ctx, slog.LevelDebug, "completer result",
 		slog.String("name", request.Body.Name),
 		slog.Int("age", compData.Age),
 		slog.String("sex", string(compData.Sex)),
@@ -217,6 +232,9 @@ func (s *Server) PersonPost( //nolint:ireturn,cyclop,funlen
 
 	personID, err := s.People.Create(ctx, person)
 	if err != nil {
+		s.Logger.Log(ctx, slog.LevelDebug, "error creating a person",
+			slog.String("message", err.Error()))
+
 		switch {
 		case errors.Is(err, repo.ErrArgument):
 			return PersonPost400Response{}, nil
@@ -224,11 +242,14 @@ func (s *Server) PersonPost( //nolint:ireturn,cyclop,funlen
 			fallthrough
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
-				slog.String("error", err.Error()))
+				slog.String("message", err.Error()))
 
 			return PersonPost5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "created a person",
+		slog.String("uuid", personID.String()))
 
 	response := PersonPost201JSONResponse{
 		Uuid: personID,
@@ -251,6 +272,9 @@ func (s *Server) PersonPut( //nolint:ireturn
 		ID:          [16]byte{},
 	})
 	if err != nil {
+		s.Logger.Log(ctx, slog.LevelDebug, "error replacing a person",
+			slog.String("message", err.Error()))
+
 		switch {
 		case errors.Is(err, repo.ErrArgument):
 			return PersonPut400Response{}, nil
@@ -265,6 +289,9 @@ func (s *Server) PersonPut( //nolint:ireturn
 			return PersonPut5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "replaced a person",
+		slog.String("uuid", request.PersonID.String()))
 
 	return PersonPut200Response{}, nil
 }
@@ -284,11 +311,14 @@ func (s *Server) PersonDelete( //nolint:ireturn
 			fallthrough
 		default:
 			s.Logger.Log(ctx, slog.LevelError, "unexpected error",
-				slog.String("error", err.Error()))
+				slog.String("message", err.Error()))
 
 			return PersonDelete5XXResponse{http.StatusInternalServerError}, nil
 		}
 	}
+
+	s.Logger.Log(ctx, slog.LevelDebug, "deleted a person",
+		slog.String("uuid", request.PersonID.String()))
 
 	return PersonDelete200Response{}, nil
 }
